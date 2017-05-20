@@ -1,0 +1,31 @@
+<textarea id="input">export i32 main(i32 a, i32 b) {
+  return ((a * b) + 42);
+};
+</textarea>
+<textarea id="buffer">
+
+</textarea>
+
+<button id="cmp">Compile</button>
+
+<script type="text/javascript" src="compiler.js"></script>
+
+<script>
+  cmp.onclick = (e) => {
+    let code = input.value;
+    let result = compile(code);
+    buffer.value = result.buffer;
+    if (result.exports.main) {
+      console.log(result.exports.main());
+    }
+  };
+  cmp.click();
+</script>
+
+<style>
+  textarea {
+    margin: 0px;
+    height: 290px;
+    width: 260px;
+  }
+</style>
