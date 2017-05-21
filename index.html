@@ -1,8 +1,16 @@
 <head>
+  <meta http-equiv="expires" content="0">
   <link rel="stylesheet" href="http://esironal.github.io/cmtouch/lib/codemirror.css">
   <script src="http://esironal.github.io/cmtouch/lib/codemirror.js"></script>
   <script src="https://codemirror.net/mode/clike/clike.js"></script>
-  <script type="text/javascript" src="compiler.js"></script>
+  <!-- compiler src -->
+  <script type="text/javascript" src="src/const.js"></script>
+  <script type="text/javascript" src="src/bytes.js"></script>
+  <script type="text/javascript" src="src/scope.js"></script>
+  <script type="text/javascript" src="src/scan.js"></script>
+  <script type="text/javascript" src="src/parse.js"></script>
+  <script type="text/javascript" src="src/emit.js"></script>
+  <script type="text/javascript" src="src/index.js"></script>
 </head>
 
 <div id="code"></div>
@@ -37,10 +45,14 @@
 <script>
   cmp.onclick = (e) => {
     let code = doc.getValue();
-    let result = compile(code, { error: (msg) => console.log(msg) });
+    let result = compile(code, {
+      error: (msg) => {
+        throw new Error(msg);
+    }});
     buffer.value = result.dump;
     if (result.exports.main) {
-      result.exports.main(2, 2);
+      let res = result.exports.main(2, 2);
+      console.log(res);
     }
   };
 </script>
