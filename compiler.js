@@ -363,6 +363,26 @@
   const WASM_EXTERN_GLOBAL = 0x3;
   const WASM_EXTERN_FUNC = 0x3;
 
+  function getWasmType(type) {
+    switch (type) {
+      case TokenList.VOID: return (WASM_TYPE_CTOR_VOID);
+      case TokenList.INT: case TokenList.INT32: return (WASM_TYPE_CTOR_I32);
+      case TokenList.INT64: return (WASM_TYPE_CTOR_I64);
+      case TokenList.FLOAT: case TokenList.FLOAT32: return (WASM_TYPE_CTOR_I32);
+      case TokenList.FLOAT64: return (WASM_TYPE_CTOR_F64);
+      case TokenList.BOOL: return (WASM_TYPE_CTOR_I32);
+    };
+    return (-1);
+  };
+  function getWasmOperator(op) {
+    switch (op) {
+      case "+": return (WASM_OPCODE_I32_ADD);
+      case "-": return (WASM_OPCODE_I32_SUB);
+      case "*": return (WASM_OPCODE_I32_MUL);
+    };
+    return (-1);
+  };
+
   // # Halp functions #
   function isBlank(cc) {
     return (
@@ -485,25 +505,17 @@
     );
   };
 
-  function getWasmType(type) {
-    switch (type) {
-      case TokenList.VOID: return (WASM_TYPE_CTOR_VOID);
-      case TokenList.INT: case TokenList.INT32: return (WASM_TYPE_CTOR_I32);
-      case TokenList.INT64: return (WASM_TYPE_CTOR_I64);
-      case TokenList.FLOAT: case TokenList.FLOAT32: return (WASM_TYPE_CTOR_I32);
-      case TokenList.FLOAT64: return (WASM_TYPE_CTOR_F64);
-      case TokenList.BOOL: return (WASM_TYPE_CTOR_I32);
-    };
-    return (-1);
-  };
-
-  function getWasmOperator(op) {
-    switch (op) {
-      case "+": return (WASM_OPCODE_I32_ADD);
-      case "-": return (WASM_OPCODE_I32_SUB);
-      case "*": return (WASM_OPCODE_I32_MUL);
-    };
-    return (-1);
+  function getOperatorPrecedence(operator) {
+    switch (operator) {
+      case "!": return (8);
+      case "*": case "/": case "%": return (7);
+      case "+": case "-": return (6);
+      case "<": case "<=": case ">": case ">=": return (5);
+      case "==": case "!=": return (4);
+      case "&&": return (3);
+      case "||": return (2);
+      case "=": return (1);
+    }
   };
 
   class ByteArray extends Array {
@@ -700,6 +712,8 @@
         // recursively search symbol inside parent
         if (this.parent) {
           return (this.parent.resolve(id));
+        } else {
+          __imports.error(id + " is not defined");
         }
       }
       return (null);
@@ -1124,7 +1138,8 @@
   function emitTypeSection(node) {
     bytes.emitU8(WASM_SECTION_TYPE);
     let size = bytes.createU32vPatch();
-    bytes.emitU8(1);
+    let count = bytes.createU32vPatch();
+    let amount = 0;
     // emit function types
     let types = [];
     node.body.map((child) => {
@@ -1142,8 +1157,10 @@
         child.returns.map((ret) => {
           bytes.emitU8(getWasmType(child.type));
         });
+        amount++;
       }
     });
+    count.patch(amount);
     // finally patch section size
     size.patch(bytes.length - 1 - size.offset);
   };
@@ -1216,23 +1233,39 @@
     }
     else if (kind === Nodes.ReturnStatement) {
       if (node.argument) emitNode(node.argument);
-      bytes.emitU32v(WASM_OPCODE_RETURN);
+      bytes.emitU8(WASM_OPCODE_RETURN);
     }
     else if (kind === Nodes.BinaryExpression) {
       emitNode(node.left);
       emitNode(node.right);
-      bytes.emitU32v(getWasmOperator(node.operator));
+      bytes.emitU8(getWasmOperator(node.operator));
     }
     else if (kind === Nodes.Literal) {
       if (node.type === Token.Identifier) {
         let resolve = scope.resolve(node.value);
-        bytes.emitU32v(WASM_OPCODE_GET_LOCAL);
+        bytes.emitU8(WASM_OPCODE_GET_LOCAL);
         bytes.emitU32v(resolve.index);
       }
       else if (node.type === Token.NumericLiteral) {
         bytes.emitU8(WASM_OPCODE_I32_CONST);
         bytes.emitU32v(parseInt(node.value));
       }
+    }
+    else if (kind === Nodes.CallExpression) {
+      let callee = node.callee.value;
+      let resolve = scope.resolve(callee);
+      node.parameter.map((child) => {
+        emitNode(child);
+      });
+      bytes.emitU8(WASM_OPCODE_CALL);
+      bytes.emitU32v(resolve.index);
+    }
+    else if (kind === Nodes.VariableDeclaration) {
+      console.log(node);
+      let resolve = scope.resolve(node.id);
+      emitNode(node.init);
+      bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+      bytes.emitU32v(resolve.index);
     }
     else {
       __imports.error("Unknown node kind " + kind);
@@ -1242,13 +1275,31 @@
   function emitFunction(node) {
     let size = bytes.createU32vPatch();
     // emit count of locals
-    bytes.emitU32v(0);
+    let locals = getLocalVariables(node);
+    // local count
+    bytes.emitU32v(locals.length);
+    // local entry signatures
+    locals.map((local) => {
+      bytes.emitU8(1);
+      bytes.emitU8(getWasmType(local.node.type));
+    });
     node.body.map((child) => {
       emitNode(child);
     });
     // patch function body size
     size.patch(bytes.length - size.offset);
     bytes.emitU8(WASM_OPCODE_END);
+  };
+
+  function getLocalVariables(node) {
+    let locals = [];
+    let idx = 0;
+    node.body.map((child) => {
+      if (child.kind === Nodes.VariableDeclaration) {
+        locals.push({ index: idx++, node: child });
+      }
+    });
+    return (locals);
   };
 
   // # compiler globals
@@ -1263,9 +1314,9 @@
   function compile(str, imports) {
     // reset
     findex = pindex = 0;
-    __imports = imports;
     scope = current = __imports = tokens = null;
     bytes = new ByteArray();
+    __imports = imports;
 
     let tkns = scan(str);
     let ast = parse(tkns);
@@ -1273,8 +1324,10 @@
     bytes.emitU32(WASM_VERSION);
     emit(ast);
     let buffer = new Uint8Array(bytes);
+    let dump = Array.from(buffer).map((v) => { return (v.toString(16)); });
     let instance = new WebAssembly.Instance(new WebAssembly.Module(buffer));
     return ({
+      dump: dump,
       buffer: buffer,
       module: instance,
       exports: instance.exports

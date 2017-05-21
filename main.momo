@@ -1,0 +1,9 @@
+i32 sqrt(i32 a) {
+  return (a * a);
+};
+
+export i32 main(i32 a, i32 b) {
+  i32 c = 4;
+  i32 d = c * 2 + a;
+  return sqrt((a * b) + d);
+};

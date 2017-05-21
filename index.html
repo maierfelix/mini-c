@@ -1,31 +1,68 @@
-<textarea id="input">export i32 main(i32 a, i32 b) {
-  return ((a * b) + 42);
-};
-</textarea>
-<textarea id="buffer">
+<head>
+  <link rel="stylesheet" href="http://esironal.github.io/cmtouch/lib/codemirror.css">
+  <script src="http://esironal.github.io/cmtouch/lib/codemirror.js"></script>
+  <script src="https://codemirror.net/mode/clike/clike.js"></script>
+  <script type="text/javascript" src="compiler.js"></script>
+</head>
 
-</textarea>
+<div id="code"></div>
+
+<textarea id="buffer"></textarea>
 
 <button id="cmp">Compile</button>
 
-<script type="text/javascript" src="compiler.js"></script>
+<script>
+  if (window.WebAssembly === void 0) {
+    alert("Your browser doesn't support WebAssembly!");
+  }
+</script>
+
+<script type="text/javascript">
+  let editor = CodeMirror(document.getElementById("code"), {
+    mode: "text/x-c++src",
+    lineNumbers: true,
+    value: "Loading.."
+  });
+  let doc = editor.getDoc();
+</script>
+
+<script>
+  let url = "main.momo?a=" + Date.now();
+  fetch(url).then((resp) => resp.text().then((text) => {
+    doc.setValue(text);
+    cmp.click();
+  }));
+</script>
 
 <script>
   cmp.onclick = (e) => {
-    let code = input.value;
-    let result = compile(code);
-    buffer.value = result.buffer;
+    let code = doc.getValue();
+    let result = compile(code, { error: (msg) => console.log(msg) });
+    buffer.value = result.dump;
     if (result.exports.main) {
-      console.log(result.exports.main());
+      result.exports.main(2, 2);
     }
   };
-  cmp.click();
 </script>
 
 <style>
   textarea {
     margin: 0px;
     height: 290px;
-    width: 260px;
+    width: 364px;
+    float: left;
+  }
+  #code {
+    width: 364px;
+    float: left;
+    height: 290px;
+  }
+  #cmp {
+    position: absolute;
+    left: 304px;
+    top: 276px;
+  }
+  .CodeMirror {
+    height: 290px;
   }
 </style>
