@@ -1,0 +1,37 @@
+const fs = require("fs");
+
+let bin = "../bin/dist.js";
+let input = fs.readFileSync("../main.momo", "utf-8");
+
+let sources = [];
+(() => {
+  let base = "../src";
+  fs.readdirSync(base).map((entry) => {
+    let file = base + "/" + entry;
+    let src = fs.readFileSync(file, "utf-8");
+    sources.push(src);
+  });
+})();
+
+let code = "(function() { \n";
+sources.map((src) => {
+  code += src;
+});
+code += "})();";
+
+fs.writeFileSync(bin, code, "utf-8");
+
+// make sure our env is >= v8.x
+(() => {
+  let version = process.version;
+  let split = version.substring(1, version.length).split(".");
+  let base = parseInt(split[0]);
+  if (base < 8) throw new Error(
+    "Unsupported our outdated node version (project requires v8.x)"
+  );
+})();
+
+let compiler = require(bin);
+let __imports = { error: (msg) => console.log(error) };
+let result = compiler(input, __imports);
+console.log(result.exports.main(2, 2));

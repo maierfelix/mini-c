@@ -213,9 +213,29 @@ function emitNode(node) {
     bytes.emitU8(WASM_OPCODE_SET_LOCAL);
     bytes.emitU32v(resolve.index);
   }
+  else if (kind === Nodes.WhileStatement) {
+    bytes.emitU8(WASM_OPCODE_BLOCK);
+    bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
+    bytes.emitU8(WASM_OPCODE_LOOP);
+    bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
+    node.body.map((child) => emitNode(child));
+    bytes.emitU8(WASM_OPCODE_BR);
+    bytes.emitU8(0);
+    bytes.emitU8(WASM_OPCODE_UNREACHABLE);
+    bytes.emitU8(WASM_OPCODE_END);
+  }
   else {
     __imports.error("Unknown node kind " + kind);
   }
+};
+
+function getLoopContext(node) {
+  let ctx = scope;
+  while (ctx !== null) {
+    if (ctx.node.kind === Nodes.WhileStatement) break;
+    ctx = ctx.parent;
+  };
+  return (ctx);
 };
 
 function emitFunction(node) {

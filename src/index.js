@@ -22,8 +22,10 @@ function compile(str, imports) {
   bytes.emitU32(WASM_VERSION);
   emit(ast);
   let buffer = new Uint8Array(bytes);
+  let valid = WebAssembly.validate(buffer);
   let dump = Array.from(buffer).map((v) => { return (v.toString(16)); });
-  let instance = new WebAssembly.Instance(new WebAssembly.Module(buffer));
+  let module = new WebAssembly.Module(buffer);
+  let instance = new WebAssembly.Instance(module);
   return ({
     dump: dump,
     buffer: buffer,
