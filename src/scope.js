@@ -26,9 +26,19 @@ function Scope() {
     }
     this.symbols[id] = node;
     if (node.kind === Nodes.VariableDeclaration || node.kind === Nodes.Parameter) {
-      node.index = this.localIndex++;
+      let scope = lookupFunctionScope(this);
+      node.index = scope.localIndex++;
     }
   };
+};
+
+function lookupFunctionScope(scope) {
+  let ctx = scope;
+  while (ctx !== null) {
+    if (ctx.node.kind === Nodes.FunctionDeclaration) break;
+    ctx = ctx.parent;
+  };
+  return (ctx);
 };
 
 function pushScope(node) {

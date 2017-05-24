@@ -101,6 +101,8 @@ let Operators = {};
   Label[Label["!="] = ++ii] = "NEQ";
   Label[Label["&&"] = ++ii] = "AND";
   Label[Label["||"] = ++ii] = "OR";
+  Label[Label["&"] = ++ii] = "BIN_AND";
+  Label[Label["|"] = ++ii] = "BIN_OR";
   Label[Label["++"] = ++ii] = "INCR";
   Label[Label["--"] = ++ii] = "DECR";
   Label[Label["=>"] = ++ii] = "CAST";

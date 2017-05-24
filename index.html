@@ -1,80 +1,89 @@
-<head>
-  <meta http-equiv="expires" content="0">
-  <link rel="stylesheet" href="http://esironal.github.io/cmtouch/lib/codemirror.css">
-  <script src="http://esironal.github.io/cmtouch/lib/codemirror.js"></script>
-  <script src="https://codemirror.net/mode/clike/clike.js"></script>
-  <!-- compiler src -->
-  <script type="text/javascript" src="src/const.js"></script>
-  <script type="text/javascript" src="src/bytes.js"></script>
-  <script type="text/javascript" src="src/scope.js"></script>
-  <script type="text/javascript" src="src/scan.js"></script>
-  <script type="text/javascript" src="src/parse.js"></script>
-  <script type="text/javascript" src="src/emit.js"></script>
-  <script type="text/javascript" src="src/index.js"></script>
-</head>
+<html>
+  <head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+    <meta http-equiv="Pragma" content="no-cache"/>
+    <meta http-equiv="Expires" content="0"/>
+    <link rel="stylesheet" href="http://esironal.github.io/cmtouch/lib/codemirror.css">
+    <script src="http://esironal.github.io/cmtouch/lib/codemirror.js"></script>
+    <script src="https://codemirror.net/mode/clike/clike.js"></script>
+    <!-- compiler src -->
+    <script type="text/javascript" src="src/const.js"></script>
+    <script type="text/javascript" src="src/bytes.js"></script>
+    <script type="text/javascript" src="src/scope.js"></script>
+    <script type="text/javascript" src="src/scan.js"></script>
+    <script type="text/javascript" src="src/parse.js"></script>
+    <script type="text/javascript" src="src/emit.js"></script>
+    <script type="text/javascript" src="src/index.js"></script>
+  </head>
+  <body>
+    <div id="code"></div>
 
-<div id="code"></div>
+    <textarea id="buffer"></textarea>
 
-<textarea id="buffer"></textarea>
+    <button id="cmp">Compile</button>
 
-<button id="cmp">Compile</button>
+    <script>
+      if (window.WebAssembly === void 0) {
+        alert("Your browser doesn't support WebAssembly!");
+      }
+    </script>
 
-<script>
-  if (window.WebAssembly === void 0) {
-    alert("Your browser doesn't support WebAssembly!");
-  }
-</script>
+    <script type="text/javascript">
+      let editor = CodeMirror(document.getElementById("code"), {
+        mode: "text/x-c++src",
+        lineNumbers: true,
+        value: "Loading.."
+      });
+      let doc = editor.getDoc();
+    </script>
 
-<script type="text/javascript">
-  let editor = CodeMirror(document.getElementById("code"), {
-    mode: "text/x-c++src",
-    lineNumbers: true,
-    value: "Loading.."
-  });
-  let doc = editor.getDoc();
-</script>
+    <script>
+      let url = "main.momo?a=" + Date.now();
+      fetch(url).then((resp) => resp.text().then((text) => {
+        doc.setValue(text);
+        cmp.click();
+      }));
+    </script>
 
-<script>
-  let url = "main.momo?a=" + Date.now();
-  fetch(url).then((resp) => resp.text().then((text) => {
-    doc.setValue(text);
-    cmp.click();
-  }));
-</script>
+    <script>
+      cmp.onclick = (e) => {
+        let code = doc.getValue();
+        let result = compile(code, {
+          error: (msg) => {
+            throw new Error(msg);
+        }});
+        buffer.value = result.dump;
+        if (result.exports.main) {
+          let res = result.exports.main(2, 2);
+          console.log(res);
+        }
+      };
+    </script>
 
-<script>
-  cmp.onclick = (e) => {
-    let code = doc.getValue();
-    let result = compile(code, {
-      error: (msg) => {
-        throw new Error(msg);
-    }});
-    buffer.value = result.dump;
-    if (result.exports.main) {
-      let res = result.exports.main(2, 2);
-      console.log(res);
-    }
-  };
-</script>
+    <script>
+    window.addEventListener("keydown", (e) => { if (e.keyCode === 13) cmd.click() });
+    </script>
 
-<style>
-  textarea {
-    margin: 0px;
-    height: 290px;
-    width: 364px;
-    float: left;
-  }
-  #code {
-    width: 364px;
-    float: left;
-    height: 290px;
-  }
-  #cmp {
-    position: absolute;
-    left: 304px;
-    top: 276px;
-  }
-  .CodeMirror {
-    height: 290px;
-  }
-</style>
+    <style>
+      textarea {
+        margin: 0px;
+        height: 290px;
+        width: 364px;
+        float: left;
+      }
+      #code {
+        width: 364px;
+        float: left;
+        height: 290px;
+      }
+      #cmp {
+        position: absolute;
+        left: 304px;
+        top: 276px;
+      }
+      .CodeMirror {
+        height: 290px;
+      }
+    </style>
+  </body>
+</html>

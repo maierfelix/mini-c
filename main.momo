@@ -1,12 +1,13 @@
-i32 fib(i32 n) {
+i32 test(i32 n) {
   if (n == 0 || n == 1) {
-    return n;
+    i32 a = 21;
+    i32 b = a * 2;
+    return (a + b);
   }
-  return fib(n - 1) + fib(n - 2);
+  return test(n - 1) + test(n - 2);
 };
 
 export i32 main(i32 a, i32 b) {
-  i32 c = 4;
-  i32 d = c * 2 + a;
-  return fib((a * b) + d);
+  i32 c = a * b;
+  return (test(a) + test(c));
 };

@@ -19,6 +19,8 @@ function getWasmOperator(op) {
     case "*": return (WASM_OPCODE_I32_MUL);
     case "==": return (WASM_OPCODE_I32_EQ);
     case "!=": return (WASM_OPCODE_I32_NEQ);
+    case "&&": return (WASM_OPCODE_I32_AND);
+    case "||": return (WASM_OPCODE_I32_OR);
   };
   return (-1);
 };
@@ -161,41 +163,12 @@ function emitNode(node) {
   }
   else if (kind === Nodes.BinaryExpression) {
     let operator = node.operator;
-    if (operator === "||") {
-      emitNode(node.left);
-      bytes.emitU8(WASM_OPCODE_IF);
-      bytes.emitU8(WASM_TYPE_I32);
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU8(1);
-      bytes.emitU8(WASM_OPCODE_ELSE);
-      emitNode(node.right);
-      bytes.emitU8(WASM_OPCODE_END);
-    }
-    else if (operator === "&&") {
-      emitNode(node.left);
-      bytes.emitU8(WASM_OPCODE_IF);
-      bytes.emitU8(WASM_TYPE_I32);
-      emitNode(node.right);
-      bytes.emitU8(WASM_OPCODE_ELSE);
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU8(0);
-      bytes.emitU8(WASM_OPCODE_END);
-    }
-    else {
+    if (operator === "=") {
+      emitAssignment(node);
+    } else {
       emitNode(node.left);
       emitNode(node.right);
       bytes.emitU8(getWasmOperator(operator));
-    }
-  }
-  else if (kind === Nodes.Literal) {
-    if (node.type === Token.Identifier) {
-      let resolve = scope.resolve(node.value);
-      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-      bytes.emitU32v(resolve.index);
-    }
-    else if (node.type === Token.NumericLiteral) {
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU32v(parseInt(node.value));
     }
   }
   else if (kind === Nodes.CallExpression) {
@@ -218,11 +191,31 @@ function emitNode(node) {
     bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
     bytes.emitU8(WASM_OPCODE_LOOP);
     bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
-    node.body.map((child) => emitNode(child));
+    // condition
+    emitNode(node.condition);
+    bytes.emitU8(WASM_OPCODE_I32_EQZ);
+    bytes.emitU8(WASM_OPCODE_BR_IF);
+    bytes.emitU8(1);
+    // body
+    emitNode(node.body);
     bytes.emitU8(WASM_OPCODE_BR);
     bytes.emitU8(0);
     bytes.emitU8(WASM_OPCODE_UNREACHABLE);
     bytes.emitU8(WASM_OPCODE_END);
+  }
+  else if (kind === Nodes.Literal) {
+    if (node.type === Token.Identifier) {
+      let resolve = scope.resolve(node.value);
+      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+      bytes.emitU32v(resolve.index);
+    }
+    else if (node.type === Token.NumericLiteral) {
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitU32v(parseInt(node.value));
+    }
+    else {
+      __imports.error("Unknown literal type " + node.type);
+    }
   }
   else {
     __imports.error("Unknown node kind " + kind);
@@ -238,33 +231,26 @@ function getLoopContext(node) {
   return (ctx);
 };
 
+function emitAssignment(node) {
+  console.log(node);
+};
+
 function emitFunction(node) {
   let size = bytes.createU32vPatch();
   // emit count of locals
-  let locals = getLocalVariables(node.body);
+  let locals = node.locals;
   // local count
   bytes.emitU32v(locals.length);
   // local entry signatures
   locals.map((local) => {
     bytes.emitU8(1);
-    bytes.emitU8(getWasmType(local.node.type));
+    bytes.emitU8(getWasmType(local.type));
   });
   // manually, dont handle a function's body as a block
   node.body.body.map((child) => emitNode(child));
   // patch function body size
   size.patch(bytes.length - size.offset);
   bytes.emitU8(WASM_OPCODE_END);
-};
-
-function getLocalVariables(node) {
-  let locals = [];
-  let idx = 0;
-  node.body.map((child) => {
-    if (child.kind === Nodes.VariableDeclaration) {
-      locals.push({ index: idx++, node: child });
-    }
-  });
-  return (locals);
 };
 
 function getLocalSignatureUniforms(locals) {

@@ -9,6 +9,13 @@ let current = null;
 let findex = 0;
 let __imports = null;
 
+function hexDump(array) {
+  let result = Array.from(array).map((v) => {
+    return (v.toString(16));
+  });
+  return (result);
+};
+
 function compile(str, imports) {
   // reset
   findex = pindex = 0;
@@ -23,7 +30,7 @@ function compile(str, imports) {
   emit(ast);
   let buffer = new Uint8Array(bytes);
   let valid = WebAssembly.validate(buffer);
-  let dump = Array.from(buffer).map((v) => { return (v.toString(16)); });
+  let dump = hexDump(buffer);
   let module = new WebAssembly.Module(buffer);
   let instance = new WebAssembly.Instance(module);
   return ({

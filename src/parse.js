@@ -10,6 +10,8 @@ function isBinaryOperator(token) {
     kind === Operators.DIV ||
     kind === Operators.OR ||
     kind === Operators.AND ||
+    kind === Operators.BIN_AND ||
+    kind === Operators.BIN_OR ||
     kind === Operators.NOT ||
     kind === Operators.LT ||
     kind === Operators.LTE ||
@@ -259,6 +261,7 @@ function parseFunctionDeclaration(type, name, extern) {
     kind: Nodes.FunctionDeclaration,
     type: type,
     id: name,
+    locals: [],
     returns: [],
     parameter: null,
     body: null
@@ -313,9 +316,12 @@ function parseVariableDeclaration(type, name, extern) {
   };
   // only allow export of global variables
   if (!!extern) expectScope(node, null);
+  else expectScope(node, Nodes.FunctionDeclaration);
   scope.register(node.id, node);
   expect(Operators.ASS);
   node.init = parseExpression();
+  let fn = lookupFunctionScope(scope).node;
+  fn.locals.push(node);
   return (node);
 };
 
@@ -438,6 +444,20 @@ function parsePrefix() {
   if (eat(TokenList.LPAREN)) {
     let node = parseExpression();
     expect(TokenList.RPAREN);
+    return (node);
+  }
+  if (current.kind === Operators.MUL) {
+    next();
+    expectIdentifier();
+    let node = parseLiteral();
+    node.isPointer = true;
+    return (node);
+  }
+  if (current.kind === Operators.BIN_AND) {
+    next();
+    expectIdentifier();
+    let node = parseLiteral();
+    node.isReference = true;
     return (node);
   }
   if (isUnaryPrefixOperator(current)) {
