@@ -25,8 +25,7 @@ function compile(str, imports) {
 
   let tkns = scan(str);
   let ast = parse(tkns);
-  bytes.emitU32(WASM_MAGIC);
-  bytes.emitU32(WASM_VERSION);
+  console.log(ast);
   emit(ast);
   let buffer = new Uint8Array(bytes);
   let valid = WebAssembly.validate(buffer);

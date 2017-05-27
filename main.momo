@@ -1,13 +1,10 @@
-i32 test(i32 n) {
-  if (n == 0 || n == 1) {
-    i32 a = 21;
-    i32 b = a * 2;
-    return (a + b);
+export i32 main() {
+  i32 a = 5;
+  while (a < 100) {
+    a = a + 15;
+  };
+  if (a >= 100) {
+    a = 42;
   }
-  return test(n - 1) + test(n - 2);
-};
-
-export i32 main(i32 a, i32 b) {
-  i32 c = a * b;
-  return (test(a) + test(c));
+  return (a);
 };

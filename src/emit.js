@@ -17,6 +17,12 @@ function getWasmOperator(op) {
     case "+": return (WASM_OPCODE_I32_ADD);
     case "-": return (WASM_OPCODE_I32_SUB);
     case "*": return (WASM_OPCODE_I32_MUL);
+    case "/": return (WASM_OPCODE_I32_DIV_S);
+    case "%": return (WASM_OPCODE_I32_REM_S);
+    case "<": return (WASM_OPCODE_I32_LT_S);
+    case "<=": return (WASM_OPCODE_I32_LE_S);
+    case ">": return (WASM_OPCODE_I32_GT_S);
+    case ">=": return (WASM_OPCODE_I32_GE_S);
     case "==": return (WASM_OPCODE_I32_EQ);
     case "!=": return (WASM_OPCODE_I32_NEQ);
     case "&&": return (WASM_OPCODE_I32_AND);
@@ -31,6 +37,8 @@ function getWasmOperator(op) {
  * 3. Code section -> function bodys
  */
 function emit(node) {
+  bytes.emitU32(WASM_MAGIC);
+  bytes.emitU32(WASM_VERSION);
   emitTypeSection(node.body);
   emitFunctionSection(node.body);
   //emitMemorySection(node);
@@ -193,14 +201,17 @@ function emitNode(node) {
     bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
     // condition
     emitNode(node.condition);
+    // break if condition != true
     bytes.emitU8(WASM_OPCODE_I32_EQZ);
     bytes.emitU8(WASM_OPCODE_BR_IF);
     bytes.emitU8(1);
     // body
-    emitNode(node.body);
+    node.body.body.map((child) => emitNode(child));
+    // jump back to top
     bytes.emitU8(WASM_OPCODE_BR);
     bytes.emitU8(0);
     bytes.emitU8(WASM_OPCODE_UNREACHABLE);
+    bytes.emitU8(WASM_OPCODE_END);
     bytes.emitU8(WASM_OPCODE_END);
   }
   else if (kind === Nodes.Literal) {
@@ -211,7 +222,7 @@ function emitNode(node) {
     }
     else if (node.type === Token.NumericLiteral) {
       bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU32v(parseInt(node.value));
+      bytes.emitLEB128(parseInt(node.value));
     }
     else {
       __imports.error("Unknown literal type " + node.type);
@@ -232,7 +243,10 @@ function getLoopContext(node) {
 };
 
 function emitAssignment(node) {
-  console.log(node);
+  let resolve = scope.resolve(node.left.value);
+  emitNode(node.right);
+  bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+  bytes.emitU32v(resolve.index);
 };
 
 function emitFunction(node) {

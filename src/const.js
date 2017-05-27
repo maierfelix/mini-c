@@ -86,26 +86,27 @@ let Operators = {};
 
 /** Operators */
 ((Label) => {
-  Label[Label["!"] = ++ii] = "NOT";
-  Label[Label["*"] = ++ii] = "MUL";
-  Label[Label["/"] = ++ii] = "DIV";
-  Label[Label["%"] = ++ii] = "MOD";
-  Label[Label["+"] = ++ii] = "ADD";
-  Label[Label["-"] = ++ii] = "SUB";
+  Label.LOWEST = ++ii;
+  // order by precedence
   Label[Label["="] = ++ii] = "ASS";
+  Label[Label["=>"] = ++ii] = "CAST";
+  Label[Label["||"] = ++ii] = "OR";
+  Label[Label["&&"] = ++ii] = "AND";
+  Label[Label["=="] = ++ii] = "EQ";
+  Label[Label["!="] = ++ii] = "NEQ";
   Label[Label["<"] = ++ii] = "LT";
   Label[Label["<="] = ++ii] = "LE";
   Label[Label[">"] = ++ii] = "GT";
   Label[Label[">="] = ++ii] = "GE";
-  Label[Label["=="] = ++ii] = "EQ";
-  Label[Label["!="] = ++ii] = "NEQ";
-  Label[Label["&&"] = ++ii] = "AND";
-  Label[Label["||"] = ++ii] = "OR";
+  Label[Label["+"] = ++ii] = "ADD";
+  Label[Label["-"] = ++ii] = "SUB";
+  Label[Label["*"] = ++ii] = "MUL";
+  Label[Label["/"] = ++ii] = "DIV";
+  Label[Label["%"] = ++ii] = "MOD";
   Label[Label["&"] = ++ii] = "BIN_AND";
   Label[Label["|"] = ++ii] = "BIN_OR";
-  Label[Label["++"] = ++ii] = "INCR";
-  Label[Label["--"] = ++ii] = "DECR";
-  Label[Label["=>"] = ++ii] = "CAST";
+  Label[Label["!"] = ++ii] = "NOT";
+  Label.HIGHEST = ++ii;
 })(Operators);
 
 /** 

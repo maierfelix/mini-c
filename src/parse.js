@@ -14,9 +14,9 @@ function isBinaryOperator(token) {
     kind === Operators.BIN_OR ||
     kind === Operators.NOT ||
     kind === Operators.LT ||
-    kind === Operators.LTE ||
+    kind === Operators.LE ||
     kind === Operators.GT ||
-    kind === Operators.GTE ||
+    kind === Operators.GE ||
     kind === Operators.EQ ||
     kind === Operators.NEQ) &&
     !isUnaryPrefixOperator(token)
@@ -57,19 +57,6 @@ function isNativeType(token) {
     kind === TokenList.VOID ||
     kind === TokenList.BOOLEAN
   );
-};
-
-function getOperatorPrecedence(operator) {
-  switch (operator) {
-    case "!": return (8);
-    case "*": case "/": case "%": return (7);
-    case "+": case "-": return (6);
-    case "<": case "<=": case ">": case ">=": return (5);
-    case "==": case "!=": return (4);
-    case "&&": return (3);
-    case "||": return (2);
-    case "=": return (1);
-  }
 };
 
 // # Parser #
@@ -145,7 +132,7 @@ function parseStatement() {
   } else if (peek(TokenList.WHILE)) {
     node = parseWhileStatement();
   } else {
-    node = parseExpression();
+    node = parseExpression(Operators.LOWEST);
     if (node === null) {
       __imports.error("Unknown node kind " + current.value + " in " + current.line + ":" + current.column);
     }
@@ -183,7 +170,7 @@ function parseWhileStatement() {
     body: null
   };
   expect(TokenList.WHILE);
-  node.condition = parseExpression();
+  node.condition = parseExpression(Operators.LOWEST);
   // braced body
   if (eat(TokenList.LBRACE)) {
     pushScope(node);
@@ -192,7 +179,7 @@ function parseWhileStatement() {
     expect(TokenList.RBRACE);
   // short body
   } else {
-    node.body = parseExpression();
+    node.body = parseExpression(Operators.LOWEST);
   }
   return (node);
 };
@@ -212,7 +199,7 @@ function parseIfStatement() {
     return (node);
   }
   expect(TokenList.LPAREN);
-  node.condition = parseExpression();
+  node.condition = parseExpression(Operators.LOWEST);
   expect(TokenList.RPAREN);
   pushScope(node);
   node.consequent = parseIfBody();
@@ -232,7 +219,7 @@ function parseIfBody() {
   // short if
   } else {
     node = [];
-    node.push(parseExpression());
+    node.push(parseExpression(Operators.LOWEST));
     eat(TokenList.SEMICOLON);
   }
   return (node);
@@ -242,7 +229,7 @@ function parseReturnStatement() {
   expect(TokenList.RETURN);
   let node = {
     kind: Nodes.ReturnStatement,
-    argument: parseExpression()
+    argument: parseExpression(Operators.LOWEST)
   };
   expectScope(node, Nodes.FunctionDeclaration);
   let item = scope;
@@ -319,7 +306,7 @@ function parseVariableDeclaration(type, name, extern) {
   else expectScope(node, Nodes.FunctionDeclaration);
   scope.register(node.id, node);
   expect(Operators.ASS);
-  node.init = parseExpression();
+  node.init = parseExpression(Operators.LOWEST);
   let fn = lookupFunctionScope(scope).node;
   fn.locals.push(node);
   return (node);
@@ -339,7 +326,7 @@ function parseCallParameters() {
   expect(TokenList.LPAREN);
   while (true) {
     if (peek(TokenList.RPAREN)) break;
-    let expr = parseExpression();
+    let expr = parseExpression(Operators.LOWEST);
     params.push(expr);
     if (!eat(TokenList.COMMA)) break;
   };
@@ -365,55 +352,6 @@ function parseContinue() {
   return (node);
 };
 
-function parseUnaryPrefixExpression() {
-  let node = {
-    kind: Nodes.UnaryPrefixExpression,
-    operator: current.value,
-    value: null
-  };
-  next();
-  node.value = parseLiteral();
-  return (node);
-};
-
-function parseUnaryPostfixExpression(left) {
-  let node = {
-    kind: Nodes.UnaryPostfixExpression,
-    operator: current.value,
-    value: left
-  };
-  next();
-  return (node);
-};
-
-function parseBinaryExpression(left) {
-  let node = {
-    kind: Nodes.BinaryExpression,
-    left: left,
-    right: null,
-    operator: current.value
-  };
-  next();
-  node.right = parseExpression();
-  return (node);
-};
-
-function parseInfix(left) {
-  if (isBinaryOperator(current)) {
-    return (parseBinaryExpression(left));
-  }
-  if (isUnaryPostfixOperator(current)) {
-    return (parseUnaryPostfixExpression(left));
-  }
-  if (peek(TokenList.LPAREN)) {
-    return (parseCallExpression(left));
-  }
-  if (isCastOperator(current)) {
-    return (parseCastExpression(left));
-  }
-  return (left);
-};
-
 function isCastOperator(token) {
   return (token.kind === Operators.CAST);
 };
@@ -437,12 +375,33 @@ function expectTypeLiteral() {
   }
 };
 
+function parseUnaryPrefixExpression() {
+  let node = {
+    kind: Nodes.UnaryPrefixExpression,
+    operator: current.value,
+    value: null
+  };
+  next();
+  node.value = parseLiteral();
+  return (node);
+};
+
+function parseUnaryPostfixExpression(left) {
+  let node = {
+    kind: Nodes.UnaryPostfixExpression,
+    operator: current.value,
+    value: left
+  };
+  next();
+  return (node);
+};
+
 function parsePrefix() {
   if (isLiteral(current)) {
     return (parseLiteral());
   }
   if (eat(TokenList.LPAREN)) {
-    let node = parseExpression();
+    let node = parseExpression(Operators.LOWEST);
     expect(TokenList.RPAREN);
     return (node);
   }
@@ -463,10 +422,41 @@ function parsePrefix() {
   if (isUnaryPrefixOperator(current)) {
     return (parseUnaryPrefixExpression());
   }
-  return (parseExpression());
+  return (parseExpression(Operators.LOWEST));
 };
 
-function parseExpression() {
+function parseBinaryExpression(level, left) {
+  let operator = current.value;
+  let precedence = Operators[operator];
+  if (level > precedence) return (left);
+  let node = {
+    kind: Nodes.BinaryExpression,
+    left: left,
+    right: null,
+    operator: operator
+  };
+  next();
+  node.right = parseExpression(precedence);
+  return (node);
+};
+
+function parseInfix(level, left) {
+  if (isBinaryOperator(current)) {
+    return (parseBinaryExpression(level, left));
+  }
+  if (isUnaryPostfixOperator(current)) {
+    return (parseUnaryPostfixExpression(left));
+  }
+  if (peek(TokenList.LPAREN)) {
+    return (parseCallExpression(left));
+  }
+  if (isCastOperator(current)) {
+    return (parseCastExpression(left));
+  }
+  return (left);
+};
+
+function parseExpression(level) {
   if (peek(TokenList.BREAK)) {
     return (parseBreak());
   }
@@ -476,7 +466,7 @@ function parseExpression() {
   let node = parsePrefix();
   while (true) {
     if (!current) break;
-    let expr = parseInfix(node);
+    let expr = parseInfix(level, node);
     if (expr === null || expr === node) break;
     node = expr;
   };
@@ -484,10 +474,15 @@ function parseExpression() {
 };
 
 function parseLiteral() {
+  let value = current.value;
+  if (current.kind === Token.IDENTIFIER) {
+    // make sure the identifier can be resolved
+    let resolve = scope.resolve(value);
+  }
   let node = {
     kind: Nodes.Literal,
     type: current.kind,
-    value: current.value
+    value: value
   };
   next();
   return (node);
