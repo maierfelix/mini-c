@@ -1,10 +1,9 @@
-export i32 main() {
-  i32 a = 5;
-  while (a < 100) {
-    a = a + 15;
-  };
-  if (a >= 100) {
-    a = 42;
+i32 fact(i32 n) {
+  if (n == 0) {
+    return 1;
   }
-  return (a);
+  return(n * fact(n - 1));
+};
+export i32 main(i32 a, i32 b) {
+  return (fact(a + b));
 };

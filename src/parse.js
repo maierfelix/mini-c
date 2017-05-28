@@ -254,6 +254,7 @@ function parseFunctionDeclaration(type, name, extern) {
     body: null
   };
   expectScope(node, null); // only allow global functions
+  scope.register(name, node);
   node.parameter = parseFunctionParameters();
   if (eat(TokenList.LBRACE)) {
     pushScope(node);
@@ -264,7 +265,6 @@ function parseFunctionDeclaration(type, name, extern) {
     popScope();
     expect(TokenList.RBRACE);
   }
-  scope.register(name, node);
   if (node.type !== TokenList.VOID && !node.returns.length) {
     __imports.error("Missing return in function: " + node.id);
   }
@@ -281,12 +281,14 @@ function parseFunctionParameters() {
     }
     const type = current.kind;
     next();
+    let isRef = eat(Operators.MUL);
     expectIdentifier();
     params.push(current);
     let param = params[params.length - 1];
     param.type = type;
     param.kind = Nodes.Parameter;
     param.isParameter = true;
+    param.isReference = isRef;
     next();
     if (!eat(TokenList.COMMA)) break;
   };
@@ -306,7 +308,12 @@ function parseVariableDeclaration(type, name, extern) {
   else expectScope(node, Nodes.FunctionDeclaration);
   scope.register(node.id, node);
   expect(Operators.ASS);
-  node.init = parseExpression(Operators.LOWEST);
+  node.init = {
+    kind: Nodes.BinaryExpression,
+    left: { kind: Nodes.Literal, type: Token.Identifier, value: node.id },
+    right: parseExpression(Operators.LOWEST),
+    operator: "="
+  };
   let fn = lookupFunctionScope(scope).node;
   fn.locals.push(node);
   return (node);
@@ -409,7 +416,7 @@ function parsePrefix() {
     next();
     expectIdentifier();
     let node = parseLiteral();
-    node.isPointer = true;
+    node.isDereference = true;
     return (node);
   }
   if (current.kind === Operators.BIN_AND) {

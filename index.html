@@ -45,23 +45,21 @@
       }));
     </script>
 
+    <input type="text" id="evalme" value="main(2, 2)" />
+    <br/>
+    <input type="text" id="output" value="" placeholder="Output" />
+
     <script>
       cmp.onclick = (e) => {
         let code = doc.getValue();
-        let result = compile(code, {
+        window.result = compile(code, {
           error: (msg) => {
             throw new Error(msg);
         }});
         buffer.value = result.dump;
-        if (result.exports.main) {
-          let res = result.exports.main(2, 2);
-          console.log(res);
-        }
+        let evaly = "window.result.exports." + evalme.value;
+        output.value = "=> " + eval(evaly);
       };
-    </script>
-
-    <script>
-    window.addEventListener("keydown", (e) => { if (e.keyCode === 13) cmd.click() });
     </script>
 
     <style>
@@ -70,6 +68,13 @@
         height: 290px;
         width: 364px;
         float: left;
+      }
+      #evalme {
+        margin-left: 5px;
+      }
+      #output {
+        margin-left: 5px;
+        margin-top: 5px;
       }
       #code {
         width: 364px;

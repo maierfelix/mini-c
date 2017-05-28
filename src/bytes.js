@@ -77,12 +77,59 @@ class ByteArray extends Array {
       idx++;
     };
   }
+  patchLEB128(value, offset) {
+    let el = 0;
+    let idx = 0;
+    do {
+      el = value & 0x7F;
+      value = value >>> 7;
+      let sign = (el & 0x40) !== 0;
+      if (
+        ((value === 0) && !sign) ||
+        ((value === -1) && sign)
+      ) {
+        this[offset + idx] = el;
+        break;
+      } else {
+        el = el | 0x80;
+        this[offset + idx] = el;
+        idx++;
+      }
+    } while (true);
+  }
+  patchULEB128(value, offset) {
+    let el = 0;
+    let idx = 0;
+    do {
+      el = value & 0x7F;
+      value = value >>> 7;
+      if (value) el = el | 0x80;
+      this[offset + idx] = el;
+      idx++;
+    } while (value);
+  }
   createU32vPatch() {
     let offset = this.length;
-    this.emitU32v(0);
+    this.emitU8(0);
     return ({
       offset: offset,
       patch: (value) => this.patchU32v(value, offset)
+    });
+  }
+  createLEB128Patch() {
+    let offset = this.length;
+    this.emitU8(0);
+    return ({
+      offset: offset,
+      patch: (value) => this.patchLEB128(value, offset)
+    });
+  }
+  createULEB128Patch() {
+    let offset = this.length;
+    this.emitU8(0);
+    return ({
+      offset: offset,
+      patch: (value) => this.patchULEB128(value, offset)
     });
   }
   emitString(str) {
