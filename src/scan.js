@@ -44,10 +44,10 @@ function isPunctuatorChar(ch) {
 
 function isOperatorChar(ch) {
   return (
+    ch === "=" ||
     ch === "+" ||
     ch === "-" ||
     ch === "!" ||
-    ch === "=" ||
     ch === "|" ||
     ch === "&" ||
     ch === ">" ||
@@ -70,6 +70,11 @@ function isOperator(str) {
     str === "&&" ||
     str === ">=" ||
     str === "<=" ||
+    str === "+=" ||
+    str === "-=" ||
+    str === "*=" ||
+    str === "/=" ||
+    str === "%=" ||
     str === "=>"
   );
 };
@@ -164,18 +169,16 @@ function scan(str) {
       continue;
     }
     // comment [//]
-    if (ch === "/") {
-      if (str.charAt(ii + 1) === "/") {
-        while (true) {
-          if (cc === 10) {
-            column = 0;
-            line++;
-            break;
-          }
-          next();
-          cc = str.charCodeAt(ii);
-        };
-      }
+    if (ch === "/" && str[ii + 1] === "/") {
+      while (true) {
+        if (cc === 10) {
+          column = 0;
+          line++;
+          break;
+        }
+        next();
+        cc = str.charCodeAt(ii);
+      };
       continue;
     }
     // punctuator [;,(,)]

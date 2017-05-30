@@ -3,6 +3,7 @@
 // # Scope #
 function Scope() {
   this.node = null;
+  this.index = 0;
   this.parent = null;
   this.symbols = {};
   // used to assign local variable indices
@@ -45,6 +46,7 @@ function pushScope(node) {
   let scp = new Scope();
   scp.node = node;
   scp.parent = scope;
+  scp.index = scope ? scope.index + 1 : 0;
   node.context = scp;
   scope = scp;
 };

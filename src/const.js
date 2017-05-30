@@ -89,6 +89,11 @@ let Operators = {};
   Label.LOWEST = ++ii;
   // order by precedence
   Label[Label["="] = ++ii] = "ASS";
+  Label[Label["+="] = ++ii] = "ADD_ASS";
+  Label[Label["-="] = ++ii] = "SUB_ASS";
+  Label[Label["*="] = ++ii] = "MUL_ASS";
+  Label[Label["/="] = ++ii] = "DIV_ASS";
+  Label[Label["%="] = ++ii] = "MOD_ASS";
   Label[Label["=>"] = ++ii] = "CAST";
   Label[Label["||"] = ++ii] = "OR";
   Label[Label["&&"] = ++ii] = "AND";

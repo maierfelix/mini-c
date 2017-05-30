@@ -18,8 +18,24 @@ function isBinaryOperator(token) {
     kind === Operators.GT ||
     kind === Operators.GE ||
     kind === Operators.EQ ||
-    kind === Operators.NEQ) &&
+    kind === Operators.NEQ ||
+    kind === Operators.ADD_ASS ||
+    kind === Operators.SUB_ASS ||
+    kind === Operators.MUL_ASS ||
+    kind === Operators.DIV_ASS ||
+    kind === Operators.MOD_ASS) &&
     !isUnaryPrefixOperator(token)
+  );
+};
+
+function isAssignmentOperator(kind) {
+  return (
+    kind === Operators.ASS ||
+    kind === Operators.ADD_ASS ||
+    kind === Operators.SUB_ASS ||
+    kind === Operators.MUL_ASS ||
+    kind === Operators.DIV_ASS ||
+    kind === Operators.MOD_ASS
   );
 };
 
@@ -107,7 +123,8 @@ function eat(kind) {
 function parseBlock() {
   let node = {
     kind: Nodes.BlockStatement,
-    body: []
+    body: [],
+    context: scope
   };
   while (true) {
     if (!current) break;
@@ -444,6 +461,21 @@ function parseBinaryExpression(level, left) {
   };
   next();
   node.right = parseExpression(precedence);
+  let okind = Operators[operator];
+  if (isAssignmentOperator(okind) && okind !== Operators.ASS) {
+    let right = {
+      kind: Nodes.BinaryExpression,
+      left: node.left,
+      operator: "=",
+      right: {
+        kind: Nodes.BinaryExpression,
+        operator: operator.charAt(0),
+        left: node.left,
+        right: node.right
+      }
+    };
+    node = right;
+  }
   return (node);
 };
 

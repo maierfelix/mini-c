@@ -37,6 +37,7 @@ function getWasmOperator(op) {
  * 3. Code section -> function bodys
  */
 function emit(node) {
+  scope = node.context;
   bytes.emitU32(WASM_MAGIC);
   bytes.emitU32(WASM_VERSION);
   emitTypeSection(node.body);
@@ -47,7 +48,7 @@ function emit(node) {
 };
 
 function emitTypeSection(node) {
-  bytes.emitU8(WASM_SECTION_TYPE);
+  bytes.emitULEB128(WASM_SECTION_TYPE);
   let size = bytes.createULEB128Patch();
   let count = bytes.createULEB128Patch();
   let amount = 0;
@@ -55,19 +56,19 @@ function emitTypeSection(node) {
   let types = [];
   node.body.map((child) => {
     if (child.kind === Nodes.FunctionDeclaration) {
-      bytes.emitU8(WASM_TYPE_CTOR_FUNC);
+      bytes.emitULEB128(WASM_TYPE_CTOR_FUNC);
       // parameter count
       bytes.emitULEB128(child.parameter.length);
       // parameter types
       child.parameter.map((param) => {
-        bytes.emitU8(getWasmType(param.type));
+        bytes.emitULEB128(getWasmType(param.type));
       });
       // emit type
       if (child.type !== TokenList.VOID) {
         // return count
         bytes.emitULEB128(1);
         // return type
-        bytes.emitU8(getWasmType(child.type));
+        bytes.emitULEB128(getWasmType(child.type));
       // void
       } else {
         bytes.emitULEB128(0);
@@ -81,7 +82,7 @@ function emitTypeSection(node) {
 };
 
 function emitFunctionSection(node) {
-  bytes.emitU8(WASM_SECTION_FUNCTION);
+  bytes.emitULEB128(WASM_SECTION_FUNCTION);
   let size = bytes.createULEB128Patch();
   let count = bytes.createULEB128Patch();
   let amount = 0;
@@ -96,7 +97,7 @@ function emitFunctionSection(node) {
 };
 
 function emitMemorySection(node) {
-  bytes.emitU8(WASM_SECTION_MEMORY);
+  bytes.emitULEB128(WASM_SECTION_MEMORY);
   // we dont use memory yet, write empty bytes
   let size = bytes.createULEB128Patch();
   bytes.emitU32v(1);
@@ -106,7 +107,7 @@ function emitMemorySection(node) {
 };
 
 function emitExportSection(node) {
-  bytes.emitU8(WASM_SECTION_EXPORT);
+  bytes.emitULEB128(WASM_SECTION_EXPORT);
   let size = bytes.createULEB128Patch();
   let count = bytes.createULEB128Patch();
   let amount = 0;
@@ -115,7 +116,7 @@ function emitExportSection(node) {
       if (child.isExported || child.id === "main") {
         amount++;
         bytes.emitString(child.id);
-        bytes.emitU8(WASM_EXTERN_FUNCTION);
+        bytes.emitULEB128(WASM_EXTERN_FUNCTION);
         bytes.emitULEB128(child.index);
       }
     }
@@ -125,7 +126,7 @@ function emitExportSection(node) {
 };
 
 function emitCodeSection(node) {
-  bytes.emitU8(WASM_SECTION_CODE);
+  bytes.emitULEB128(WASM_SECTION_CODE);
   let size = bytes.createULEB128Patch();
   let count = bytes.createULEB128Patch();
   let amount = 0;
@@ -141,14 +142,15 @@ function emitCodeSection(node) {
 
 function emitNode(node) {
   let kind = node.kind;
-  if (node.context) scope = node.context;
   if (kind === Nodes.BlockStatement) {
-    bytes.emitU8(WASM_OPCODE_BLOCK);
-    bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
+    if (node.context) scope = node.context;
+    bytes.emitULEB128(WASM_OPCODE_BLOCK);
+    bytes.emitULEB128(WASM_TYPE_CTOR_BLOCK);
     node.body.map((child) => {
       emitNode(child);
     });
-    bytes.emitU8(WASM_OPCODE_END);
+    bytes.emitULEB128(WASM_OPCODE_END);
+    if (node.context) scope = scope.parent;
   }
   else if (kind === Nodes.FunctionDeclaration) {
     emitFunction(node);
@@ -156,19 +158,19 @@ function emitNode(node) {
   else if (kind === Nodes.IfStatement) {
     if (node.condition) {
       emitNode(node.condition);
-      bytes.emitU8(WASM_OPCODE_IF);
-      bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
+      bytes.emitULEB128(WASM_OPCODE_IF);
+      bytes.emitULEB128(WASM_TYPE_CTOR_BLOCK);
     }
     emitNode(node.consequent);
     if (node.alternate) {
-      bytes.emitU8(WASM_OPCODE_ELSE);
+      bytes.emitULEB128(WASM_OPCODE_ELSE);
       emitNode(node.alternate);
     }
-    if (node.condition) bytes.emitU8(WASM_OPCODE_END);
+    if (node.condition) bytes.emitULEB128(WASM_OPCODE_END);
   }
   else if (kind === Nodes.ReturnStatement) {
     if (node.argument) emitNode(node.argument);
-    bytes.emitU8(WASM_OPCODE_RETURN);
+    bytes.emitULEB128(WASM_OPCODE_RETURN);
   }
   else if (kind === Nodes.BinaryExpression) {
     let operator = node.operator;
@@ -181,12 +183,12 @@ function emitNode(node) {
       } else {
         emitNode(node.right);
       }
-      bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+      bytes.emitULEB128(WASM_OPCODE_SET_LOCAL);
       bytes.emitULEB128(resolve.index);
     } else {
       emitNode(node.left);
       emitNode(node.right);
-      bytes.emitU8(getWasmOperator(operator));
+      bytes.emitULEB128(getWasmOperator(operator));
     }
   }
   else if (kind === Nodes.CallExpression) {
@@ -195,45 +197,59 @@ function emitNode(node) {
     node.parameter.map((child) => {
       emitNode(child);
     });
-    bytes.emitU8(WASM_OPCODE_CALL);
+    bytes.emitULEB128(WASM_OPCODE_CALL);
     bytes.emitULEB128(resolve.index);
   }
   else if (kind === Nodes.VariableDeclaration) {
     let resolve = scope.resolve(node.id);
     // default initialisation with zero
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(0);
-    bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+    bytes.emitULEB128(WASM_OPCODE_I32_CONST);
+    bytes.emitULEB128(0);
+    bytes.emitULEB128(WASM_OPCODE_SET_LOCAL);
     bytes.emitULEB128(resolve.index);
     // emit final initialisation
     emitNode(node.init);
   }
   else if (kind === Nodes.WhileStatement) {
-    bytes.emitU8(WASM_OPCODE_BLOCK);
-    bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
-    bytes.emitU8(WASM_OPCODE_LOOP);
-    bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
+    bytes.emitULEB128(WASM_OPCODE_BLOCK);
+    bytes.emitULEB128(WASM_TYPE_CTOR_BLOCK);
+    bytes.emitULEB128(WASM_OPCODE_LOOP);
+    bytes.emitULEB128(WASM_TYPE_CTOR_BLOCK);
     // condition
     emitNode(node.condition);
     // break if condition != true
-    bytes.emitU8(WASM_OPCODE_I32_EQZ);
-    bytes.emitU8(WASM_OPCODE_BR_IF);
-    bytes.emitU8(1);
-    // body
+    bytes.emitULEB128(WASM_OPCODE_I32_EQZ);
+    bytes.emitULEB128(WASM_OPCODE_BR_IF);
+    bytes.emitULEB128(1);
+    // manually emit body
+    scope = node.context;
     node.body.body.map((child) => emitNode(child));
+    scope = scope.parent;
     // jump back to top
-    bytes.emitU8(WASM_OPCODE_BR);
-    bytes.emitU8(0);
-    bytes.emitU8(WASM_OPCODE_UNREACHABLE);
-    bytes.emitU8(WASM_OPCODE_END);
-    bytes.emitU8(WASM_OPCODE_END);
+    bytes.emitULEB128(WASM_OPCODE_BR);
+    bytes.emitULEB128(0);
+    bytes.emitULEB128(WASM_OPCODE_UNREACHABLE);
+    bytes.emitULEB128(WASM_OPCODE_END);
+    bytes.emitULEB128(WASM_OPCODE_END);
+  }
+  else if (kind === Nodes.BreakStatement) {
+    bytes.emitULEB128(WASM_OPCODE_BR);
+    let label = getLoopContext().index;
+    bytes.emitLEB128(label);
+    bytes.emitULEB128(WASM_OPCODE_UNREACHABLE);
+  }
+  else if (kind === Nodes.ContinueStatement) {
+    bytes.emitULEB128(WASM_OPCODE_BR);
+    let label = getLoopContext().index;
+    bytes.emitLEB128(label - 1);
+    bytes.emitULEB128(WASM_OPCODE_UNREACHABLE);
   }
   else if (kind === Nodes.Literal) {
     if (node.type === Token.Identifier) {
       emitIdentifier(node);
     }
     else if (node.type === Token.NumericLiteral) {
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitULEB128(WASM_OPCODE_I32_CONST);
       bytes.emitLEB128(parseInt(node.value));
     }
     else {
@@ -245,7 +261,7 @@ function emitNode(node) {
   }
 };
 
-function getLoopContext(node) {
+function getLoopContext() {
   let ctx = scope;
   while (ctx !== null) {
     if (ctx.node.kind === Nodes.WhileStatement) break;
@@ -256,21 +272,21 @@ function getLoopContext(node) {
 
 function emitIdentifier(node) {
   let resolve = scope.resolve(node.value);
-  bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+  bytes.emitULEB128(WASM_OPCODE_GET_LOCAL);
   bytes.emitULEB128(resolve.index);
   if (node.isReference) {
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(0);
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // size alignment
+    bytes.emitULEB128(WASM_OPCODE_I32_CONST);
+    bytes.emitULEB128(0);
+    bytes.emitULEB128(WASM_OPCODE_I32_STORE);
+    bytes.emitULEB128(2); // size alignment
     bytes.emitULEB128(resolve.index);
     console.log("Store", node.value, "at:", resolve.index);
   }
   else if (node.isDereference) {
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(0);
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // size alignment
+    bytes.emitULEB128(WASM_OPCODE_I32_CONST);
+    bytes.emitULEB128(0);
+    bytes.emitULEB128(WASM_OPCODE_I32_LOAD);
+    bytes.emitULEB128(2); // size alignment
     bytes.emitULEB128(resolve.index);
     console.log("Load", node.value, "at:", resolve.index);
   }
@@ -284,14 +300,16 @@ function emitFunction(node) {
   bytes.emitULEB128(locals.length);
   // local entry signatures
   locals.map((local) => {
-    bytes.emitU8(1);
-    bytes.emitU8(getWasmType(local.type));
+    bytes.emitULEB128(1);
+    bytes.emitULEB128(getWasmType(local.type));
   });
   // manually, dont handle a function's body as a block
+  scope = node.context;
   node.body.body.map((child) => emitNode(child));
+  scope = scope.parent;
   // patch function body size
   size.patch(bytes.length - size.offset);
-  bytes.emitU8(WASM_OPCODE_END);
+  bytes.emitULEB128(WASM_OPCODE_END);
 };
 
 function getLocalSignatureUniforms(locals) {
