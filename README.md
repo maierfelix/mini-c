@@ -25,8 +25,8 @@ export i32 main(i32 a, i32 b) {
  - **Emitter**: Recursively walks the AST (*Luke ASTwalker*) and clumps together a uint8 array which gets passed over into WebAssembly
 
 ### Planned features:
- - Structs (import/export bridge to JavaScript)
- - Pointers (I always get a strange bug when i try to store something in memory)
+ - Structs (with import/export bridge to JavaScript)
+ - Pointers (I always get a strange bug when trying to store something in memory)
 
 ### Contribution:
- - Feel free to send any kind of pull request as long as it's not grammy fixxes ⭐
+ - Feel free to send any kind of pull request as long as it's not grandmmar fixxes ⭐
