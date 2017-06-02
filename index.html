@@ -51,6 +51,7 @@
 
     <script>
       cmp.onclick = (e) => {
+        buffer.value = output.value = "";
         let code = doc.getValue();
         window.result = compile(code, {
           error: (msg) => {

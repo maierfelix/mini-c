@@ -275,16 +275,12 @@ function emitIdentifier(node) {
   bytes.emitULEB128(WASM_OPCODE_GET_LOCAL);
   bytes.emitULEB128(resolve.index);
   if (node.isReference) {
-    bytes.emitULEB128(WASM_OPCODE_I32_CONST);
-    bytes.emitULEB128(0);
     bytes.emitULEB128(WASM_OPCODE_I32_STORE);
     bytes.emitULEB128(2); // size alignment
-    bytes.emitULEB128(resolve.index);
+    bytes.emitULEB128(0);
     console.log("Store", node.value, "at:", resolve.index);
   }
   else if (node.isDereference) {
-    bytes.emitULEB128(WASM_OPCODE_I32_CONST);
-    bytes.emitULEB128(0);
     bytes.emitULEB128(WASM_OPCODE_I32_LOAD);
     bytes.emitULEB128(2); // size alignment
     bytes.emitULEB128(resolve.index);

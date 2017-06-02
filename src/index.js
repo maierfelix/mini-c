@@ -25,19 +25,20 @@ function compile(str, imports) {
 
   let tkns = scan(str);
   let ast = parse(tkns);
-  console.log(ast);
   emit(ast);
   let buffer = new Uint8Array(bytes);
   let valid = WebAssembly.validate(buffer);
   let dump = hexDump(buffer);
   let module = new WebAssembly.Module(buffer);
   let instance = new WebAssembly.Instance(module);
-  return ({
+  let output = {
     dump: dump,
     buffer: buffer,
     module: instance,
     exports: instance.exports
-  });
+  };
+  console.log(output);
+  return (output);
 };
 
 if (typeof module === "object" && module.exports) {
