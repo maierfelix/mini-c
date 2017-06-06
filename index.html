@@ -65,7 +65,7 @@
         let now = performance.now();
         let out = main(2, 2);
         let then = performance.now();
-        let time = String(then - now).slice(0, 6);
+        let time = String(then - now).slice(0, 8);
         elapsed.innerHTML = "Executed in: " + time + "ms";
         output.value = "=> " + out;
       };
