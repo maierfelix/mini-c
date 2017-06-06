@@ -28,19 +28,20 @@ function compile(str, imports) {
   //console.log(ast);
   emit(ast);
   let buffer = new Uint8Array(bytes);
-  let valid = WebAssembly.validate(buffer);
   let dump = hexDump(buffer);
-  let module = new WebAssembly.Module(buffer);
-  let instance = new WebAssembly.Instance(module);
-  let output = {
-    ast: ast,
-    dump: dump,
-    buffer: buffer,
-    instance: instance,
-    exports: instance.exports
-  };
-  console.log(output);
-  return (output);
+  return new Promise((resolve, reject) => {
+    WebAssembly.instantiate(buffer).then((result) => {
+      let instance = result.instance;
+      let output = {
+        ast: ast,
+        dump: dump,
+        buffer: buffer,
+        instance: instance,
+        exports: instance.exports
+      };
+      resolve(output);
+    });
+  });
 };
 
 if (typeof module === "object" && module.exports) {

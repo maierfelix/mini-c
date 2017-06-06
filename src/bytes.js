@@ -108,22 +108,16 @@ class ByteArray extends Array {
   patchU32v(value, offset) {
     var current = value >>> 0;
     var max = -1 >>> 0;
-
     while (true) {
       var element = current & 127;
       current = current >>> 7;
       max = max >>> 7;
-
       if (max !== 0) {
         element = element | 128;
       }
-
       this[offset] = element & 255;
-      offset = offset + 1 | 0;
-
-      if (max === 0) {
-        break;
-      }
+      offset++;
+      if (max === 0) break;
     };
   }
   writeVarUnsigned(value) {

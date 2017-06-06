@@ -58,7 +58,7 @@ function emitTypeSection(node) {
     if (child.kind === Nodes.FunctionDeclaration) {
       bytes.emitU8(WASM_TYPE_CTOR_FUNC);
       // parameter count
-      bytes.emitULEB128(child.parameter.length);
+      bytes.writeVarUnsigned(child.parameter.length);
       // parameter types
       child.parameter.map((param) => {
         bytes.emitU8(getWasmType(param.type));
@@ -66,12 +66,12 @@ function emitTypeSection(node) {
       // emit type
       if (child.type !== TokenList.VOID) {
         // return count
-        bytes.emitULEB128(1);
+        bytes.emitU8(1);
         // return type
         bytes.emitU8(getWasmType(child.type));
       // void
       } else {
-        bytes.emitULEB128(0);
+        bytes.emitU8(0);
       }
       amount++;
     }
@@ -202,7 +202,7 @@ function emitNode(node) {
         emitNode(node.right);
       }
       bytes.emitU8(WASM_OPCODE_SET_LOCAL);
-      bytes.emitULEB128(resolve.index);
+      bytes.writeVarUnsigned(resolve.index);
     } else {
       emitNode(node.left);
       emitNode(node.right);
@@ -216,7 +216,7 @@ function emitNode(node) {
       emitNode(child);
     });
     bytes.emitU8(WASM_OPCODE_CALL);
-    bytes.emitULEB128(resolve.index);
+    bytes.writeVarUnsigned(resolve.index);
   }
   else if (kind === Nodes.VariableDeclaration) {
     let resolve = scope.resolve(node.id);
@@ -224,7 +224,7 @@ function emitNode(node) {
     bytes.emitU8(WASM_OPCODE_I32_CONST);
     bytes.emitU8(0);
     bytes.emitU8(WASM_OPCODE_SET_LOCAL);
-    bytes.emitULEB128(resolve.index);
+    bytes.writeVarUnsigned(resolve.index);
     // emit final initialisation
     emitNode(node.init);
   }
@@ -256,7 +256,7 @@ function emitNode(node) {
   else if (kind === Nodes.ContinueStatement) {
     bytes.emitU8(WASM_OPCODE_BR);
     let label = getLoopDepthIndex();
-    bytes.emitLEB128(label - 1);
+    bytes.emitULEB128(label - 1);
     bytes.emitU8(WASM_OPCODE_UNREACHABLE);
   }
   else if (kind === Nodes.Literal) {
@@ -290,17 +290,17 @@ function getLoopDepthIndex() {
 function emitIdentifier(node) {
   let resolve = scope.resolve(node.value);
   bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-  bytes.emitULEB128(resolve.index);
+  bytes.writeVarUnsigned(resolve.index);
   if (node.isReference) {
     bytes.emitU8(WASM_OPCODE_I32_STORE);
     bytes.emitU8(2); // size alignment i32
-    bytes.emitULEB128(0);
+    bytes.emitU8(0);
     console.log("Store", node.value, "at:", resolve.index);
   }
   else if (node.isDereference) {
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // size alignment i32
-    bytes.emitULEB128(resolve.index);
+    bytes.writeVarUnsigned(resolve.index);
     console.log("Load", node.value, "at:", resolve.index);
   }
 };
@@ -310,13 +310,12 @@ function emitFunction(node) {
   // emit count of locals
   let locals = node.locals;
   // local count
-  bytes.emitULEB128(locals.length);
+  bytes.writeVarUnsigned(locals.length);
   // local entry signatures
   locals.map((local) => {
     bytes.emitULEB128(1);
     bytes.emitU8(getWasmType(local.type));
   });
-  // manually, dont handle a function's body as a block
   emitNode(node.body);
   // patch function body size
   bytes.emitU8(WASM_OPCODE_END);

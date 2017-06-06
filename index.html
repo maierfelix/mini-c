@@ -55,19 +55,21 @@
       cmp.onclick = (e) => {
         buffer.value = output.value = "";
         let code = doc.getValue();
-        window.result = compile(code, {
-          error: (msg) => {
-            throw new Error(msg);
-        }});
-        buffer.value = result.dump;
-        let main = result.exports.main;
-        let evaly = "window.result.exports." + evalme.value;
-        let now = performance.now();
-        let out = main(2, 2);
-        let then = performance.now();
-        let time = String(then - now).slice(0, 8);
-        elapsed.innerHTML = "Executed in: " + time + "ms";
-        output.value = "=> " + out;
+        let _import = {
+          error: (msg) => { throw new Error(msg) }
+        };
+        compile(code, _import).then((result) => {
+          console.log(result);
+          buffer.value = result.dump;
+          let main = result.exports.main;
+          let evaly = "window.result.exports." + evalme.value;
+          let now = performance.now();
+          let out = main(2, 2);
+          let then = performance.now();
+          let time = String(then - now).slice(0, 8);
+          elapsed.innerHTML = "Executed in: " + time + "ms";
+          output.value = "=> " + out;
+        });
       };
     </script>
 
