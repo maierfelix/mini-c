@@ -5,10 +5,5 @@ i32 fact(i32 n) {
   return (n * fact(n - 1));
 };
 export i32 main(i32 a, i32 b) {
-  i32 c = fact(a + b);
-  while (c != 0) {
-    c += 1;
-    if (c >= 100) break;
-  };
-  return (c);
+  return (fact(a + b));
 };
