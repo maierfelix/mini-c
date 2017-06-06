@@ -64,19 +64,6 @@ class ByteArray extends Array {
       }
     } while (true);
   }
-  patchU32v(value, offset) {
-    let idx = 0;
-    while (true) {
-      let v = value & 0xff;
-      value = value >>> 7;
-      if (value == 0) {
-        this[offset + idx] = v;
-        break;
-      }
-      this[offset + idx] = v | 0x80;
-      idx++;
-    };
-  }
   patchLEB128(value, offset) {
     let el = 0;
     let idx = 0;
@@ -109,12 +96,49 @@ class ByteArray extends Array {
     } while (value);
   }
   createU32vPatch() {
+    this.writeVarUnsigned(~0);
     let offset = this.length;
-    this.emitU8(0);
     return ({
       offset: offset,
-      patch: (value) => this.patchU32v(value, offset)
+      patch: (value) => {
+        this.patchU32v(value, offset - 5);
+      }
     });
+  }
+  patchU32v(value, offset) {
+    var current = value >>> 0;
+    var max = -1 >>> 0;
+
+    while (true) {
+      var element = current & 127;
+      current = current >>> 7;
+      max = max >>> 7;
+
+      if (max !== 0) {
+        element = element | 128;
+      }
+
+      this[offset] = element & 255;
+      offset = offset + 1 | 0;
+
+      if (max === 0) {
+        break;
+      }
+    };
+  }
+  writeVarUnsigned(value) {
+    var current = value >>> 0;
+    while (true) {
+      var element = current & 127;
+      current = current >>> 7;
+      if (current !== 0) {
+        element = element | 128;
+      }
+      this.push(element & 255);
+      if (current === 0) {
+        break;
+      }
+    }
   }
   createLEB128Patch() {
     let offset = this.length;

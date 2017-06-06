@@ -25,6 +25,7 @@ function compile(str, imports) {
 
   let tkns = scan(str);
   let ast = parse(tkns);
+  //console.log(ast);
   emit(ast);
   let buffer = new Uint8Array(bytes);
   let valid = WebAssembly.validate(buffer);
@@ -32,9 +33,10 @@ function compile(str, imports) {
   let module = new WebAssembly.Module(buffer);
   let instance = new WebAssembly.Instance(module);
   let output = {
+    ast: ast,
     dump: dump,
     buffer: buffer,
-    module: instance,
+    instance: instance,
     exports: instance.exports
   };
   console.log(output);

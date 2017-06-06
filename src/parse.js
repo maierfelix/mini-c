@@ -8,6 +8,7 @@ function isBinaryOperator(token) {
     kind === Operators.SUB ||
     kind === Operators.MUL ||
     kind === Operators.DIV ||
+    kind === Operators.MOD ||
     kind === Operators.OR ||
     kind === Operators.AND ||
     kind === Operators.BIN_AND ||

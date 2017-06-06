@@ -48,6 +48,8 @@
     <input type="text" id="evalme" value="main(2, 2)" />
     <br/>
     <input type="text" id="output" value="" placeholder="Output" />
+    <br/>
+    <i id="elapsed"></i>
 
     <script>
       cmp.onclick = (e) => {
@@ -58,8 +60,14 @@
             throw new Error(msg);
         }});
         buffer.value = result.dump;
+        let main = result.exports.main;
         let evaly = "window.result.exports." + evalme.value;
-        output.value = "=> " + eval(evaly);
+        let now = performance.now();
+        let out = main(2, 2);
+        let then = performance.now();
+        let time = String(then - now).slice(0, 6);
+        elapsed.innerHTML = "Executed in: " + time + "ms";
+        output.value = "=> " + out;
       };
     </script>
 
@@ -86,6 +94,9 @@
         position: absolute;
         left: 304px;
         top: 276px;
+      }
+      #elapsed {
+        margin-left: 5px;
       }
       .CodeMirror {
         height: 290px;

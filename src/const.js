@@ -114,6 +114,15 @@ let Operators = {};
   Label.HIGHEST = ++ii;
 })(Operators);
 
+function getLabelName(index) {
+  index = index | 0;
+  if (Nodes[index] !== void 0) return (Nodes[index]);
+  if (Token[index] !== void 0) return (Token[index]);
+  if (TokenList[index] !== void 0) return (TokenList[index]);
+  if (Operators[index] !== void 0) return (Operators[index]);
+  return ("undefined");
+};
+
 /** 
  * Auto generate
  * str access key
