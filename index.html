@@ -1,8 +1,5 @@
 <html>
   <head>
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-    <meta http-equiv="Pragma" content="no-cache"/>
-    <meta http-equiv="Expires" content="0"/>
     <link rel="stylesheet" href="http://esironal.github.io/cmtouch/lib/codemirror.css">
     <script src="http://esironal.github.io/cmtouch/lib/codemirror.js"></script>
     <script src="https://codemirror.net/mode/clike/clike.js"></script>
@@ -15,7 +12,7 @@
     <script type="text/javascript" src="src/emit.js"></script>
     <script type="text/javascript" src="src/index.js"></script>
   </head>
-  <body>
+    <body>
     <div id="code"></div>
 
     <textarea id="buffer"></textarea>
@@ -45,9 +42,9 @@
       }));
     </script>
 
-    <input type="text" id="evalme" value="main(2, 2)" />
-    <br/>
     <input type="text" id="output" value="" placeholder="Output" />
+    <br/>
+    <i id="celapsed"></i>
     <br/>
     <i id="elapsed"></i>
 
@@ -58,15 +55,19 @@
         let _import = {
           error: (msg) => { throw new Error(msg) }
         };
+        let cnow = performance.now();
         compile(code, _import).then((result) => {
-          console.log(result);
+          let cthen = performance.now();
           buffer.value = result.dump;
           let main = result.exports.main;
-          let evaly = "window.result.exports." + evalme.value;
+          let memory = new Uint8Array(result.memory.buffer);
           let now = performance.now();
-          let out = main(2, 2);
+          let out = main();
           let then = performance.now();
           let time = String(then - now).slice(0, 8);
+          let ctime = String(cthen - cnow).slice(0, 8);
+          console.log(memory);
+          celapsed.innerHTML = "Compiled in: " + ctime + "ms";
           elapsed.innerHTML = "Executed in: " + time + "ms";
           output.value = "=> " + out;
         });
@@ -80,12 +81,8 @@
         width: 364px;
         float: left;
       }
-      #evalme {
-        margin-left: 5px;
-      }
       #output {
         margin-left: 5px;
-        margin-top: 5px;
       }
       #code {
         width: 364px;
@@ -96,6 +93,9 @@
         position: absolute;
         left: 304px;
         top: 276px;
+      }
+      #celapsed {
+        margin-left: 5px;
       }
       #elapsed {
         margin-left: 5px;

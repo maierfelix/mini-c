@@ -205,9 +205,9 @@ function emitNode(node) {
   else if (kind === Nodes.IfStatement) {
     if (node.condition) {
       emitNode(node.condition);
+      bytes.emitU8(WASM_OPCODE_IF);
+      bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
     }
-    bytes.emitU8(WASM_OPCODE_IF);
-    bytes.emitU8(WASM_TYPE_CTOR_BLOCK);
     emitNode(node.consequent);
     if (node.alternate) {
       bytes.emitU8(WASM_OPCODE_ELSE);
@@ -403,9 +403,9 @@ function emitIdentifier(node) {
       bytes.emitU8(WASM_OPCODE_GET_GLOBAL);
     } else {
       bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+      //console.log("Load local value", node.value);
     }
     bytes.writeVarUnsigned(resolve.index);
-    //console.log("Load local value", node.value);
   }
 };
 
