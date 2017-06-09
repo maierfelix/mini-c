@@ -22,6 +22,7 @@ function compile(str, imports) {
   scope = current = __imports = tokens = null;
   bytes = new ByteArray();
   __imports = imports;
+  currentHeapOffset = 3;
 
   let tkns = scan(str);
   let ast = parse(tkns);
@@ -36,6 +37,7 @@ function compile(str, imports) {
         ast: ast,
         dump: dump,
         buffer: buffer,
+        memory: instance.exports.memory,
         instance: instance,
         exports: instance.exports
       };

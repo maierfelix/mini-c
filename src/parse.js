@@ -164,12 +164,13 @@ function parseDeclaration(extern) {
   expectTypeLiteral();
   const type = current.kind;
   next();
+  const isPointer = eat(Operators.MUL);
   expectIdentifier();
   const name = current.value;
   next();
   const token = current.kind;
   if (token === Operators.ASS) {
-    node = parseVariableDeclaration(type, name, extern);
+    node = parseVariableDeclaration(type, name, extern, isPointer);
   }
   else if (TokenList.LPAREN) {
     node = parseFunctionDeclaration(type, name, extern);
@@ -299,14 +300,14 @@ function parseFunctionParameters() {
     }
     const type = current.kind;
     next();
-    let isRef = eat(Operators.MUL);
+    let isPointer = eat(Operators.MUL);
     expectIdentifier();
     params.push(current);
     let param = params[params.length - 1];
     param.type = type;
     param.kind = Nodes.Parameter;
     param.isParameter = true;
-    param.isReference = isRef;
+    param.isPointer = isPointer;
     next();
     if (!eat(TokenList.COMMA)) break;
   };
@@ -314,12 +315,13 @@ function parseFunctionParameters() {
   return (params);
 };
 
-function parseVariableDeclaration(type, name, extern) {
+function parseVariableDeclaration(type, name, extern, isPointer) {
   let node = {
     kind: Nodes.VariableDeclaration,
     type: type,
     id: name,
-    init: null
+    init: null,
+    isPointer
   };
   // only allow export of global variables
   if (!!extern) expectScope(node, null);
@@ -434,14 +436,18 @@ function parsePrefix() {
     next();
     expectIdentifier();
     let node = parseLiteral();
+    let resolve = scope.resolve(node.value);
     node.isDereference = true;
+    resolve.isMemoryLocated = true;
     return (node);
   }
   if (current.kind === Operators.BIN_AND) {
     next();
     expectIdentifier();
     let node = parseLiteral();
+    let resolve = scope.resolve(node.value);
     node.isReference = true;
+    resolve.isMemoryLocated = true;
     return (node);
   }
   if (isUnaryPrefixOperator(current)) {

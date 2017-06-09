@@ -1,18 +1,16 @@
-i32 fact(i32 n) {
-  if (n == 0) {
-    return 1;
-  }
-  return (n * fact(n - 1));
+i32 swap(i32 *c, i32 *d) {
+  i32 tmp = *c;
+  *c = *d;
+  *d = tmp;
+  return (0);
 };
-export i32 main(i32 a, i32 b) {
-  i32 c = fact(a + b);
-  while (c != 0) {
-    c += 1;
-    if (c >= 100) {
-      if (1) {
-        break;
-      }
-    }
-  };
-  return (c);
+
+// swaps adress of a, b
+i32 main() {
+  i32 a = 42;
+  i32 b = 1337;
+  i32 *ptrA = &a;
+  i32 *ptrB = &b;
+  i32 res = swap(ptrA, ptrB);
+  return (a);
 };

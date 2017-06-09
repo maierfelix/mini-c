@@ -121,6 +121,13 @@ function emitExportSection(node) {
       }
     }
   });
+  // export memory
+  (() => {
+    amount++;
+    bytes.emitString("memory");
+    bytes.emitU8(WASM_EXTERN_MEMORY);
+    bytes.emitULEB128(0);
+  })();
   count.patch(amount);
   size.patch(bytes.length - size.offset);
 };
@@ -138,6 +145,11 @@ function emitCodeSection(node) {
   });
   count.patch(amount);
   size.patch(bytes.length - size.offset);
+};
+
+let currentHeapOffset = 3;
+function growHeap(amount) {
+  currentHeapOffset += amount;
 };
 
 function emitNode(node) {
@@ -187,28 +199,6 @@ function emitNode(node) {
     if (node.argument) emitNode(node.argument);
     bytes.emitU8(WASM_OPCODE_RETURN);
   }
-  else if (kind === Nodes.BinaryExpression) {
-    let operator = node.operator;
-    if (operator === "=") {
-      if (node.left.kind !== Nodes.Literal) {
-        __imports.error("Invalid left-hand side in assignment");
-      }
-      let resolve = scope.resolve(node.left.value);
-      // deep assignment
-      if (node.right.operator === "=") {
-        emitNode(node.right);
-        emitNode(node.right.left);
-      } else {
-        emitNode(node.right);
-      }
-      bytes.emitU8(WASM_OPCODE_SET_LOCAL);
-      bytes.writeVarUnsigned(resolve.index);
-    } else {
-      emitNode(node.left);
-      emitNode(node.right);
-      bytes.emitU8(getWasmOperator(operator));
-    }
-  }
   else if (kind === Nodes.CallExpression) {
     let callee = node.callee.value;
     let resolve = scope.resolve(callee);
@@ -219,14 +209,7 @@ function emitNode(node) {
     bytes.writeVarUnsigned(resolve.index);
   }
   else if (kind === Nodes.VariableDeclaration) {
-    let resolve = scope.resolve(node.id);
-    // default initialisation with zero
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(0);
-    bytes.emitU8(WASM_OPCODE_SET_LOCAL);
-    bytes.writeVarUnsigned(resolve.index);
-    // emit final initialisation
-    emitNode(node.init);
+    emitVariableDeclaration(node);
   }
   else if (kind === Nodes.WhileStatement) {
     bytes.emitU8(WASM_OPCODE_BLOCK);
@@ -271,6 +254,50 @@ function emitNode(node) {
       __imports.error("Unknown literal type " + node.type);
     }
   }
+  else if (kind === Nodes.BinaryExpression) {
+    let operator = node.operator;
+    if (operator === "=") {
+      if (node.left.kind !== Nodes.Literal) {
+        __imports.error("Invalid left-hand side in assignment");
+      }
+      let resolve = scope.resolve(node.left.value);
+      if (resolve.isMemoryLocated) {
+        if (resolve.isParameter) {
+          bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+          bytes.writeVarUnsigned(resolve.index);
+        } else {
+          bytes.emitU8(WASM_OPCODE_I32_CONST);
+          bytes.writeVarUnsigned(resolve.offset);
+        }
+      }
+      if (resolve.isPointer && !isMemoryVariableInitialisation && !resolve.isParameter) {
+        //console.log(resolve, node);
+        bytes.emitU8(WASM_OPCODE_I32_CONST);
+        bytes.writeVarUnsigned(resolve.offset);
+        bytes.emitU8(WASM_OPCODE_I32_LOAD);
+        bytes.emitU8(2); // i32
+        bytes.writeVarUnsigned(0);
+      }
+      if (node.right.operator === "=") {
+        emitNode(node.right);
+        emitNode(node.right.left);
+      } else {
+        emitNode(node.right);
+      }
+      if (resolve.isMemoryLocated) {
+        bytes.emitU8(WASM_OPCODE_I32_STORE);
+        bytes.emitU8(2); // i32
+        bytes.writeVarUnsigned(0);
+      } else {
+        bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+        bytes.writeVarUnsigned(resolve.index);
+      }
+    } else {
+      emitNode(node.left);
+      emitNode(node.right);
+      bytes.emitU8(getWasmOperator(operator));
+    }
+  }
   else {
     __imports.error("Unknown node kind " + kind);
   }
@@ -287,21 +314,70 @@ function getLoopDepthIndex() {
   return (label);
 };
 
+let isMemoryVariableInitialisation = false;
+function emitVariableDeclaration(node) {
+  let resolve = scope.resolve(node.id);
+  let storeInMemory = resolve.isMemoryLocated;
+  if (storeInMemory) {
+    node.offset = currentHeapOffset;
+    //console.log("Store variable", node.id, "in memory at", node.offset);
+    growHeap(4);
+    // initialise
+    isMemoryVariableInitialisation = true;
+    emitNode(node.init);
+    isMemoryVariableInitialisation = false;
+  } else {
+    //console.log("Store variable", node.id, "in local stack at", resolve.index);
+    // default initialisation with zero
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.emitU8(0);
+    bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+    bytes.writeVarUnsigned(resolve.index);
+    // emit final initialisation
+    emitNode(node.init);
+  }
+};
+
 function emitIdentifier(node) {
   let resolve = scope.resolve(node.value);
-  bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-  bytes.writeVarUnsigned(resolve.index);
   if (node.isReference) {
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // size alignment i32
-    bytes.emitU8(0);
-    console.log("Store", node.value, "at:", resolve.index);
+    //console.log("Load memory location of", node.value, ":", resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.writeVarUnsigned(resolve.offset);
   }
+  // gets dereferenced
   else if (node.isDereference) {
+    if (resolve.isParameter) {
+      //console.log("Dereference parameter", resolve.index);
+      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+      bytes.writeVarUnsigned(resolve.index);
+    } else {
+      // load pointer adress
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.writeVarUnsigned(resolve.offset);
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+    }
+    // load pointed variable value
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // size alignment i32
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+  }
+  // stored inside memory
+  else if (resolve.isMemoryLocated) {
+    //console.log("Load value of", node.value, "from memory at:", resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.writeVarUnsigned(resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+  }
+  // local resolve
+  else {
+    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
     bytes.writeVarUnsigned(resolve.index);
-    console.log("Load", node.value, "at:", resolve.index);
+    //console.log("Load local value", node.value);
   }
 };
 
