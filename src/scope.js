@@ -26,9 +26,12 @@ function Scope() {
       __imports.error("Symbol " + id + " is already defined");
     }
     this.symbols[id] = node;
-    if (node.kind === Nodes.VariableDeclaration || node.kind === Nodes.Parameter) {
-      let scope = lookupFunctionScope(this);
-      node.index = scope.localIndex++;
+    // append local index for non-global variables
+    if (this.parent !== null) {
+      if (node.kind === Nodes.VariableDeclaration || node.kind === Nodes.Parameter) {
+        let scope = lookupFunctionScope(this);
+        node.index = scope.localIndex++;
+      }
     }
   };
 };

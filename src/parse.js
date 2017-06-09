@@ -321,12 +321,16 @@ function parseVariableDeclaration(type, name, extern, isPointer) {
     type: type,
     id: name,
     init: null,
+    isGlobal: false,
     isPointer
   };
   // only allow export of global variables
-  if (!!extern) expectScope(node, null);
-  else expectScope(node, Nodes.FunctionDeclaration);
+  if (extern) expectScope(node, null);
+  //expectScope(node, Nodes.FunctionDeclaration);
   scope.register(node.id, node);
+  if (scope.parent === null) {
+    node.isGlobal = true;
+  }
   expect(Operators.ASS);
   node.init = {
     kind: Nodes.BinaryExpression,
@@ -334,8 +338,10 @@ function parseVariableDeclaration(type, name, extern, isPointer) {
     right: parseExpression(Operators.LOWEST),
     operator: "="
   };
-  let fn = lookupFunctionScope(scope).node;
-  fn.locals.push(node);
+  if (!node.isGlobal) {
+    let fn = lookupFunctionScope(scope).node;
+    fn.locals.push(node);
+  }
   return (node);
 };
 

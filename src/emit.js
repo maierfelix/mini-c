@@ -43,8 +43,30 @@ function emit(node) {
   emitTypeSection(node.body);
   emitFunctionSection(node.body);
   emitMemorySection(node);
+  emitGlobalSection(node.body);
   emitExportSection(node.body);
   emitCodeSection(node.body);
+};
+
+function emitGlobalSection(node) {
+  bytes.emitU8(WASM_SECTION_GLOBAL);
+  let size = bytes.createU32vPatch();
+  let count = bytes.createU32vPatch();
+  let amount = 0;
+  node.body.map((child) => {
+    if (child.kind === Nodes.VariableDeclaration && child.isGlobal) {
+      let init = child.init.right;
+      // global have their own indices, patch it here
+      child.index = amount++;
+      bytes.emitU8(getWasmType(child.type));
+      // mutability, enabled by default
+      bytes.emitU8(1);
+      emitNode(init);
+      bytes.emitU8(WASM_OPCODE_END);
+    }
+  });
+  count.patch(amount);
+  size.patch(bytes.length - size.offset);
 };
 
 function emitTypeSection(node) {
@@ -52,8 +74,6 @@ function emitTypeSection(node) {
   let size = bytes.createU32vPatch();
   let count = bytes.createU32vPatch();
   let amount = 0;
-  // emit function types
-  let types = [];
   node.body.map((child) => {
     if (child.kind === Nodes.FunctionDeclaration) {
       bytes.emitU8(WASM_TYPE_CTOR_FUNC);
@@ -89,7 +109,7 @@ function emitFunctionSection(node) {
   node.body.map((child) => {
     if (child.kind === Nodes.FunctionDeclaration) {
       amount++;
-      bytes.emitULEB128(child.index);
+      bytes.writeVarUnsigned(child.index);
     }
   });
   count.patch(amount);
@@ -117,7 +137,7 @@ function emitExportSection(node) {
         amount++;
         bytes.emitString(child.id);
         bytes.emitU8(WASM_EXTERN_FUNCTION);
-        bytes.emitULEB128(child.index);
+        bytes.writeVarUnsigned(child.index);
       }
     }
   });
@@ -126,7 +146,7 @@ function emitExportSection(node) {
     amount++;
     bytes.emitString("memory");
     bytes.emitU8(WASM_EXTERN_MEMORY);
-    bytes.emitULEB128(0);
+    bytes.emitU8(0);
   })();
   count.patch(amount);
   size.patch(bytes.length - size.offset);
@@ -233,13 +253,13 @@ function emitNode(node) {
   else if (kind === Nodes.BreakStatement) {
     bytes.emitU8(WASM_OPCODE_BR);
     let label = getLoopDepthIndex();
-    bytes.emitULEB128(label);
+    bytes.writeVarUnsigned(label);
     bytes.emitU8(WASM_OPCODE_UNREACHABLE);
   }
   else if (kind === Nodes.ContinueStatement) {
     bytes.emitU8(WASM_OPCODE_BR);
     let label = getLoopDepthIndex();
-    bytes.emitULEB128(label - 1);
+    bytes.writeVarUnsigned(label - 1);
     bytes.emitU8(WASM_OPCODE_UNREACHABLE);
   }
   else if (kind === Nodes.Literal) {
@@ -289,7 +309,11 @@ function emitNode(node) {
         bytes.emitU8(2); // i32
         bytes.writeVarUnsigned(0);
       } else {
-        bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+        if (resolve.isGlobal) {
+          bytes.emitU8(WASM_OPCODE_SET_GLOBAL);
+        } else {
+          bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+        }
         bytes.writeVarUnsigned(resolve.index);
       }
     } else {
@@ -375,7 +399,11 @@ function emitIdentifier(node) {
   }
   // local resolve
   else {
-    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+    if (resolve.isGlobal) {
+      bytes.emitU8(WASM_OPCODE_GET_GLOBAL);
+    } else {
+      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+    }
     bytes.writeVarUnsigned(resolve.index);
     //console.log("Load local value", node.value);
   }
@@ -389,7 +417,7 @@ function emitFunction(node) {
   bytes.writeVarUnsigned(locals.length);
   // local entry signatures
   locals.map((local) => {
-    bytes.emitULEB128(1);
+    bytes.emitU8(1);
     bytes.emitU8(getWasmType(local.type));
   });
   emitNode(node.body);
