@@ -1,5 +1,4 @@
-# mini-wasm
-
+# <img width="10%" src="http://i.imgur.com/mquA9Ww.png" /> mini-wasm 
 [Just let me play with it](http://maierfelix.github.io/mini-wasm/)
 
 ### Description:
@@ -24,9 +23,9 @@ export i32 main(i32 a, i32 b) {
  - **Parser**: Eats tokens and generates an AST out of them
  - **Emitter**: Recursively walks the AST (*Luke ASTwalker*) and clumps together a uint8 array which gets passed over into WebAssembly
 
-### Planned features:
- - Structs (with import/export bridge to JavaScript)
- - Pointers (I always get a strange bug when trying to store something in memory)
+### API:
+
+
 
 ### Contribution:
- - Feel free to send any kind of pull request as long as it's not grandmmar fixxes ⭐
+ - Feel free to send any kind of pull request
