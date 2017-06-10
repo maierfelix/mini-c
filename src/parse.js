@@ -25,7 +25,9 @@ function isBinaryOperator(token) {
     kind === Operators.MUL_ASS ||
     kind === Operators.DIV_ASS ||
     kind === Operators.MOD_ASS) &&
-    !isUnaryPrefixOperator(token)
+    (kind !== Operators.NOT &&
+    kind !== Operators.INCR &&
+    kind !== Operators.DECR)
   );
 };
 
@@ -43,6 +45,8 @@ function isAssignmentOperator(kind) {
 function isUnaryPrefixOperator(token) {
   let kind = token.kind;
   return (
+    kind === Operators.SUB ||
+    kind === Operators.ADD ||
     kind === Operators.NOT ||
     kind === Operators.INCR ||
     kind === Operators.DECR
@@ -86,6 +90,7 @@ function parse(tkns) {
     body: null
   };
   pushScope(node);
+  global = scope;
   node.body = parseBlock();
   return (node);
 };
@@ -334,7 +339,12 @@ function parseVariableDeclaration(type, name, extern, isPointer) {
   expect(Operators.ASS);
   node.init = {
     kind: Nodes.BinaryExpression,
-    left: { kind: Nodes.Literal, type: Token.Identifier, value: node.id },
+    left: {
+      kind: Nodes.Literal,
+      type: Token.Identifier,
+      value: node.id,
+      isInitialVariableDeclaration: true
+    },
     right: parseExpression(Operators.LOWEST),
     operator: "="
   };
@@ -415,7 +425,7 @@ function parseUnaryPrefixExpression() {
     value: null
   };
   next();
-  node.value = parseLiteral();
+  node.value = parseExpression(Operators.UNARY_PREFIX);
   return (node);
 };
 
@@ -497,6 +507,9 @@ function parseInfix(level, left) {
     return (parseBinaryExpression(level, left));
   }
   if (isUnaryPostfixOperator(current)) {
+    if (level >= Operators.UNARY_POSTFIX) {
+      return (left);
+    }
     return (parseUnaryPostfixExpression(left));
   }
   if (peek(TokenList.LPAREN)) {
@@ -528,8 +541,16 @@ function parseExpression(level) {
 function parseLiteral() {
   let value = current.value;
   if (current.kind === Token.IDENTIFIER) {
+    let ignore = (
+      value === "free" ||
+      value === "malloc"
+    );
+    // manually register native calls
+    if (ignore && !global.symbols[value]) {
+      global.register(value, {});
+    }
     // make sure the identifier can be resolved
-    let resolve = scope.resolve(value);
+    scope.resolve(value);
   }
   let node = {
     kind: Nodes.Literal,

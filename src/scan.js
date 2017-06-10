@@ -152,7 +152,7 @@ function scan(str) {
       continue;
     }
     // number [0-9,-0]
-    if (isNumber(cc) || cc === 45 && isNumber(str.charCodeAt(ii+1))) {
+    if (isNumber(cc)) {
       let start = ii;
       while (true) {
         if (!isNumber(cc) && cc !== 45) {

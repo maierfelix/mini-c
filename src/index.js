@@ -3,6 +3,7 @@
 // # compiler globals
 let bytes = null;
 let scope = null;
+let global = null;
 let pindex = 0;
 let tokens = null;
 let current = null;
@@ -19,7 +20,7 @@ function hexDump(array) {
 function compile(str, imports) {
   // reset
   findex = pindex = 0;
-  scope = current = __imports = tokens = null;
+  scope = global = current = __imports = tokens = null;
   bytes = new ByteArray();
   __imports = imports;
   currentHeapOffset = 3;

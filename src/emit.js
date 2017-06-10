@@ -12,6 +12,16 @@ function getWasmType(type) {
   return (-1);
 };
 
+function getNativeTypeSize(type) {
+  switch (type) {
+    case TokenList.INT: case TokenList.INT32: return (4);
+    case TokenList.INT64: return (8);
+    case TokenList.FLOAT: case TokenList.FLOAT32: return (4);
+    case TokenList.FLOAT64: return (8);
+  };
+  return (-1);
+};
+
 function getWasmOperator(op) {
   switch (op) {
     case "+": return (WASM_OPCODE_I32_ADD);
@@ -221,12 +231,17 @@ function emitNode(node) {
   }
   else if (kind === Nodes.CallExpression) {
     let callee = node.callee.value;
-    let resolve = scope.resolve(callee);
-    node.parameter.map((child) => {
-      emitNode(child);
-    });
-    bytes.emitU8(WASM_OPCODE_CALL);
-    bytes.writeVarUnsigned(resolve.index);
+    if (callee === "malloc") {
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.writeVarUnsigned(42);
+    } else {
+      let resolve = scope.resolve(callee);
+      node.parameter.map((child) => {
+        emitNode(child);
+      });
+      bytes.emitU8(WASM_OPCODE_CALL);
+      bytes.writeVarUnsigned(resolve.index);
+    }
   }
   else if (kind === Nodes.VariableDeclaration) {
     emitVariableDeclaration(node);
@@ -274,6 +289,63 @@ function emitNode(node) {
       __imports.error("Unknown literal type " + node.type);
     }
   }
+  else if (kind === Nodes.UnaryPrefixExpression) {
+    let operator = node.operator;
+    // 0 - x
+    if (operator === "-") {
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitU8(0);
+      emitNode(node.value);
+      bytes.emitU8(WASM_OPCODE_I32_SUB);
+    }
+    // ignored
+    else if (operator === "+") {
+      emitNode(node.value);
+    }
+    // x = 0
+    else if (operator === "!") {
+      emitNode(node.value);
+      bytes.emitU8(WASM_OPCODE_I32_EQZ);
+    }
+    else if (operator === "++" || operator === "--") {
+      let local = node.value;
+      let resolve = scope.resolve(local.value);
+      let op = (
+        node.operator === "++" ? WASM_OPCODE_I32_ADD : WASM_OPCODE_I32_SUB
+      );
+      emitNode(local);
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitU8(1);
+      bytes.emitU8(op);
+      bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
+      bytes.writeVarUnsigned(resolve.offset);
+    }
+  }
+  else if (kind === Nodes.UnaryPostfixExpression) {
+    let local = node.value;
+    let resolve = scope.resolve(local.value);
+    if (node.operator === "++") {
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitU8(1);
+      emitIdentifier(local);
+      bytes.emitU8(WASM_OPCODE_I32_ADD);
+      bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
+      bytes.writeVarUnsigned(resolve.offset);
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitU8(1);
+      bytes.emitU8(WASM_OPCODE_I32_SUB);
+    } else if (node.operator === "--") {
+      emitIdentifier(local);
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitU8(1);
+      bytes.emitU8(WASM_OPCODE_I32_SUB);
+      bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
+      bytes.writeVarUnsigned(resolve.offset);
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitU8(1);
+      bytes.emitU8(WASM_OPCODE_I32_ADD);
+    }
+  }
   else if (kind === Nodes.BinaryExpression) {
     let operator = node.operator;
     if (operator === "=") {
@@ -290,7 +362,7 @@ function emitNode(node) {
           bytes.writeVarUnsigned(resolve.offset);
         }
       }
-      if (resolve.isPointer && !isMemoryVariableInitialisation && !resolve.isParameter) {
+      if (resolve.isPointer && !node.isInitialVariableDeclaration && !resolve.isParameter) {
         //console.log(resolve, node);
         bytes.emitU8(WASM_OPCODE_I32_CONST);
         bytes.writeVarUnsigned(resolve.offset);
@@ -338,7 +410,6 @@ function getLoopDepthIndex() {
   return (label);
 };
 
-let isMemoryVariableInitialisation = false;
 function emitVariableDeclaration(node) {
   let resolve = scope.resolve(node.id);
   let storeInMemory = resolve.isMemoryLocated;
@@ -347,9 +418,7 @@ function emitVariableDeclaration(node) {
     //console.log("Store variable", node.id, "in memory at", node.offset);
     growHeap(4);
     // initialise
-    isMemoryVariableInitialisation = true;
     emitNode(node.init);
-    isMemoryVariableInitialisation = false;
   } else {
     //console.log("Store variable", node.id, "in local stack at", resolve.index);
     // default initialisation with zero

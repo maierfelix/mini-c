@@ -87,6 +87,7 @@ let Operators = {};
 /** Operators */
 ((Label) => {
   Label.LOWEST = ++ii;
+  Label.UNARY_POSTFIX = ++ii;
   // order by precedence
   Label[Label["="] = ++ii] = "ASS";
   Label[Label["+="] = ++ii] = "ADD_ASS";
@@ -111,6 +112,9 @@ let Operators = {};
   Label[Label["&"] = ++ii] = "BIN_AND";
   Label[Label["|"] = ++ii] = "BIN_OR";
   Label[Label["!"] = ++ii] = "NOT";
+  Label[Label["--"] = ++ii] = "DECR";
+  Label[Label["++"] = ii] = "INCR";
+  Label.UNARY_PREFIX = ++ii;
   Label.HIGHEST = ++ii;
 })(Operators);
 
