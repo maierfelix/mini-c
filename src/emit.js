@@ -322,72 +322,12 @@ function emitNode(node) {
     }
   }
   else if (kind === Nodes.UnaryPostfixExpression) {
-    let local = node.value;
-    let resolve = scope.resolve(local.value);
-    if (node.operator === "++") {
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU8(1);
-      emitIdentifier(local);
-      bytes.emitU8(WASM_OPCODE_I32_ADD);
-      bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
-      bytes.writeVarUnsigned(resolve.offset);
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU8(1);
-      bytes.emitU8(WASM_OPCODE_I32_SUB);
-    } else if (node.operator === "--") {
-      emitIdentifier(local);
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU8(1);
-      bytes.emitU8(WASM_OPCODE_I32_SUB);
-      bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
-      bytes.writeVarUnsigned(resolve.offset);
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU8(1);
-      bytes.emitU8(WASM_OPCODE_I32_ADD);
-    }
+    emitPostfixExpression(node);
   }
   else if (kind === Nodes.BinaryExpression) {
     let operator = node.operator;
     if (operator === "=") {
-      if (node.left.kind !== Nodes.Literal) {
-        __imports.error("Invalid left-hand side in assignment");
-      }
-      let resolve = scope.resolve(node.left.value);
-      if (resolve.isMemoryLocated) {
-        if (resolve.isParameter) {
-          bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-          bytes.writeVarUnsigned(resolve.index);
-        } else {
-          bytes.emitU8(WASM_OPCODE_I32_CONST);
-          bytes.writeVarUnsigned(resolve.offset);
-        }
-      }
-      if (resolve.isPointer && !node.isInitialVariableDeclaration && !resolve.isParameter) {
-        //console.log(resolve, node);
-        bytes.emitU8(WASM_OPCODE_I32_CONST);
-        bytes.writeVarUnsigned(resolve.offset);
-        bytes.emitU8(WASM_OPCODE_I32_LOAD);
-        bytes.emitU8(2); // i32
-        bytes.writeVarUnsigned(0);
-      }
-      if (node.right.operator === "=") {
-        emitNode(node.right);
-        emitNode(node.right.left);
-      } else {
-        emitNode(node.right);
-      }
-      if (resolve.isMemoryLocated) {
-        bytes.emitU8(WASM_OPCODE_I32_STORE);
-        bytes.emitU8(2); // i32
-        bytes.writeVarUnsigned(0);
-      } else {
-        if (resolve.isGlobal) {
-          bytes.emitU8(WASM_OPCODE_SET_GLOBAL);
-        } else {
-          bytes.emitU8(WASM_OPCODE_SET_LOCAL);
-        }
-        bytes.writeVarUnsigned(resolve.index);
-      }
+      emitAssignment(node);
     } else {
       emitNode(node.left);
       emitNode(node.right);
@@ -396,6 +336,55 @@ function emitNode(node) {
   }
   else {
     __imports.error("Unknown node kind " + kind);
+  }
+};
+
+function emitAssignment(node) {
+  if (node.left.kind !== Nodes.Literal) {
+    __imports.error("Invalid left-hand side in assignment");
+  }
+  let resolve = scope.resolve(node.left.value);
+  // prepare variable to load from memory
+  if (resolve.isMemoryLocated) {
+    if (resolve.isParameter) {
+      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+      bytes.writeVarUnsigned(resolve.index);
+    } else {
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.writeVarUnsigned(resolve.offset);
+    }
+  }
+  // assignment to a pointer's adress
+  if (resolve.isPointer && !insideVariableDeclaration && !resolve.isParameter) {
+    //console.log("Assignment to pointer", resolve.id, ":", resolve.offset);
+    emitNode(node.right);
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+    return;
+  }
+  if (node.right.operator === "=") {
+    emitNode(node.right);
+    emitNode(node.right.left);
+  } else {
+    emitNode(node.right);
+  }
+  // assign to memory located variable
+  if (resolve.isMemoryLocated) {
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+  // assign to local variable
+  } else {
+    if (resolve.isGlobal) {
+      bytes.emitU8(WASM_OPCODE_SET_GLOBAL);
+    } else {
+      bytes.emitU8(WASM_OPCODE_SET_LOCAL);
+    }
+    bytes.writeVarUnsigned(resolve.index);
   }
 };
 
@@ -410,15 +399,18 @@ function getLoopDepthIndex() {
   return (label);
 };
 
+let insideVariableDeclaration = false;
 function emitVariableDeclaration(node) {
   let resolve = scope.resolve(node.id);
   let storeInMemory = resolve.isMemoryLocated;
   if (storeInMemory) {
     node.offset = currentHeapOffset;
-    //console.log("Store variable", node.id, "in memory at", node.offset);
+    console.log("Store variable", node.id, "in memory at", node.offset);
     growHeap(4);
     // initialise
+    insideVariableDeclaration = true;
     emitNode(node.init);
+    insideVariableDeclaration = false;
   } else {
     //console.log("Store variable", node.id, "in local stack at", resolve.index);
     // default initialisation with zero
@@ -457,9 +449,14 @@ function emitIdentifier(node) {
     bytes.emitU8(2); // i32
     bytes.writeVarUnsigned(0);
   }
+  else if (resolve.isPointer) {
+    console.log("Load adress of pointer", node.value, ":", resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.writeVarUnsigned(resolve.offset);
+  }
   // stored inside memory
   else if (resolve.isMemoryLocated) {
-    //console.log("Load value of", node.value, "from memory at:", resolve.offset);
+    console.log("Load value of", node.value, "from memory at:", resolve.offset);
     bytes.emitU8(WASM_OPCODE_I32_CONST);
     bytes.writeVarUnsigned(resolve.offset);
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
@@ -475,6 +472,32 @@ function emitIdentifier(node) {
       //console.log("Load local value", node.value);
     }
     bytes.writeVarUnsigned(resolve.index);
+  }
+};
+
+function emitPostfixExpression(node) {
+  let local = node.value;
+  let resolve = scope.resolve(local.value);
+  if (node.operator === "++") {
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.emitU8(1);
+    emitIdentifier(local);
+    bytes.emitU8(WASM_OPCODE_I32_ADD);
+    bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
+    bytes.writeVarUnsigned(resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.emitU8(1);
+    bytes.emitU8(WASM_OPCODE_I32_SUB);
+  } else if (node.operator === "--") {
+    emitIdentifier(local);
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.emitU8(1);
+    bytes.emitU8(WASM_OPCODE_I32_SUB);
+    bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
+    bytes.writeVarUnsigned(resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.emitU8(1);
+    bytes.emitU8(WASM_OPCODE_I32_ADD);
   }
 };
 

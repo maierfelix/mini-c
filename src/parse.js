@@ -329,6 +329,8 @@ function parseVariableDeclaration(type, name, extern, isPointer) {
     isGlobal: false,
     isPointer
   };
+  // force pointers to be stored inside memory
+  if (isPointer) node.isMemoryLocated = true;
   // only allow export of global variables
   if (extern) expectScope(node, null);
   //expectScope(node, Nodes.FunctionDeclaration);
@@ -342,8 +344,7 @@ function parseVariableDeclaration(type, name, extern, isPointer) {
     left: {
       kind: Nodes.Literal,
       type: Token.Identifier,
-      value: node.id,
-      isInitialVariableDeclaration: true
+      value: node.id
     },
     right: parseExpression(Operators.LOWEST),
     operator: "="
