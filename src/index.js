@@ -19,7 +19,7 @@ function hexDump(array) {
 
 function loadStdlib() {
   return new Promise((resolve, reject) => {
-    fetch("../stdlib/memory.momo").then((resp) => resp.text().then((txt) => {
+    fetch("./stdlib/memory.momo").then((resp) => resp.text().then((txt) => {
       resolve(txt);
     }));
   });
