@@ -351,7 +351,7 @@ function emitAssignment(node) {
   }
   // assignment to a pointer's adress
   if (resolve.isPointer && !insideVariableDeclaration && !resolve.isParameter) {
-    //console.log("Assignment to pointer", resolve.id, ":", resolve.offset);
+    console.log("Assignment to pointer", resolve.id, ":", resolve.offset);
     emitNode(node.right);
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // i32
