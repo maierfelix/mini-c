@@ -65,6 +65,7 @@ function isLiteral(token) {
   let kind = token.kind;
   return (
     kind === Token.NumericLiteral ||
+    kind === Token.HexadecimalLiteral ||
     kind === Token.BooleanLiteral ||
     kind === Token.Identifier
   );
@@ -542,14 +543,14 @@ function parseExpression(level) {
 function parseLiteral() {
   let value = current.value;
   if (current.kind === Token.IDENTIFIER) {
-    let ignore = (
+    /*let ignore = (
       value === "free" ||
       value === "malloc"
     );
     // manually register native calls
     if (ignore && !global.symbols[value]) {
       global.register(value, {});
-    }
+    }*/
     // make sure the identifier can be resolved
     scope.resolve(value);
   }

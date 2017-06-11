@@ -47,6 +47,7 @@ let Operators = {};
   Label[Label["NullLiteral"] = ++ii] = "NullLiteral";
   Label[Label["StringLiteral"] = ++ii] = "StringLiteral";
   Label[Label["NumericLiteral"] = ++ii] = "NumericLiteral";
+  Label[Label["HexadecimalLiteral"] = ++ii] = "HexadecimalLiteral";
 })(Token);
 
 /** Tokens */

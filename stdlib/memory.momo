@@ -1,0 +1,2 @@
+i32 malloc(i32 bytes) { return (0); };
+i32 free(i32 *ptr) { return (0); };

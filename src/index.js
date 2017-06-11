@@ -17,6 +17,14 @@ function hexDump(array) {
   return (result);
 };
 
+function loadStdlib() {
+  return new Promise((resolve, reject) => {
+    fetch("../stdlib/memory.momo").then((resp) => resp.text().then((txt) => {
+      resolve(txt);
+    }));
+  });
+};
+
 function compile(str, imports) {
   // reset
   findex = pindex = 0;
@@ -24,25 +32,27 @@ function compile(str, imports) {
   bytes = new ByteArray();
   __imports = imports;
   currentHeapOffset = 3;
-
-  let tkns = scan(str);
-  let ast = parse(tkns);
-  //console.log(ast);
-  emit(ast);
-  let buffer = new Uint8Array(bytes);
-  let dump = hexDump(buffer);
   return new Promise((resolve, reject) => {
-    WebAssembly.instantiate(buffer).then((result) => {
-      let instance = result.instance;
-      let output = {
-        ast: ast,
-        dump: dump,
-        buffer: buffer,
-        memory: instance.exports.memory,
-        instance: instance,
-        exports: instance.exports
-      };
-      resolve(output);
+    loadStdlib().then((code) => {
+      str = code + str;
+      let tkns = scan(str);
+      let ast = parse(tkns);
+      //console.log(ast);
+      emit(ast);
+      let buffer = new Uint8Array(bytes);
+      let dump = hexDump(buffer);
+      WebAssembly.instantiate(buffer).then((result) => {
+        let instance = result.instance;
+        let output = {
+          ast: ast,
+          dump: dump,
+          buffer: buffer,
+          memory: instance.exports.memory,
+          instance: instance,
+          exports: instance.exports
+        };
+        resolve(output);
+      });
     });
   });
 };

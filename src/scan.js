@@ -31,6 +31,13 @@ function isNumber(cc) {
   );
 };
 
+function isHex(cc) {
+  return (
+    isNumber(cc) ||
+    (cc >= 97 && cc <= 102)
+  );
+};
+
 function isPunctuatorChar(ch) {
   return (
     ch === "(" ||
@@ -153,6 +160,24 @@ function scan(str) {
     }
     // number [0-9,-0]
     if (isNumber(cc)) {
+      // hexadecimal
+      if (str.charAt(ii+1) === "x") {
+        let start = ii;
+        next();
+        while (true) {
+          if (!isHex(cc)) {
+            ii--;
+            column--;
+            break;
+          }
+          next();
+          cc = str.charCodeAt(ii);
+        };
+        let content = str.slice(start, ii+1);
+        let token = createToken(Token.HexadecimalLiteral, content, line, column);
+        tokens.push(token);
+        continue;
+      }
       let start = ii;
       while (true) {
         if (!isNumber(cc) && cc !== 45) {

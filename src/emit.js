@@ -231,17 +231,12 @@ function emitNode(node) {
   }
   else if (kind === Nodes.CallExpression) {
     let callee = node.callee.value;
-    if (callee === "malloc") {
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.writeVarUnsigned(42);
-    } else {
-      let resolve = scope.resolve(callee);
-      node.parameter.map((child) => {
-        emitNode(child);
-      });
-      bytes.emitU8(WASM_OPCODE_CALL);
-      bytes.writeVarUnsigned(resolve.index);
-    }
+    let resolve = scope.resolve(callee);
+    node.parameter.map((child) => {
+      emitNode(child);
+    });
+    bytes.emitU8(WASM_OPCODE_CALL);
+    bytes.writeVarUnsigned(resolve.index);
   }
   else if (kind === Nodes.VariableDeclaration) {
     emitVariableDeclaration(node);
@@ -281,7 +276,7 @@ function emitNode(node) {
     if (node.type === Token.Identifier) {
       emitIdentifier(node);
     }
-    else if (node.type === Token.NumericLiteral) {
+    else if (node.type === Token.NumericLiteral || node.type === Token.HexadecimalLiteral) {
       bytes.emitU8(WASM_OPCODE_I32_CONST);
       bytes.emitLEB128(parseInt(node.value));
     }
