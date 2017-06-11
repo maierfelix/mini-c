@@ -31,7 +31,7 @@ function compile(str, imports) {
   scope = global = current = __imports = tokens = null;
   bytes = new ByteArray();
   __imports = imports;
-  currentHeapOffset = 4;
+  currentHeapOffset = 0;
   return new Promise((resolve, reject) => {
     loadStdlib().then((code) => {
       str = code + str;

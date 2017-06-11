@@ -195,6 +195,7 @@ function scan(str) {
     }
     // comment [//]
     if (ch === "/" && str[ii + 1] === "/") {
+      // TODO: add support for /* */
       while (true) {
         if (cc === 10) {
           column = 0;

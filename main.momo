@@ -1,8 +1,17 @@
+i32 swap(i32 *c, i32 *d) {
+  i32 tmp = *c;
+  *c = *d;
+  *d = tmp;
+  return (0);
+};
+
+// swaps adress of a, b
 i32 main() {
   i32 a = 42;
-  i32 b = 1337;
+  i32 b = 66;
   i32 *ptrA = &a;
   i32 *ptrB = &b;
-  ptrA = ptrB;
-  return (ptrA == ptrB);
+  // ptrA = ptrB; prevents swapping
+  i32 res = swap(ptrA, ptrB);
+  return (a);
 };

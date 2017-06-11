@@ -150,6 +150,11 @@ class ByteArray extends Array {
       patch: (value) => this.patchULEB128(value, offset)
     });
   }
+  emitUi32(value) {
+    value = value | 0;
+    this.emitU8(WASM_OPCODE_I32_CONST);
+    this.writeVarUnsigned(value);
+  }
   emitString(str) {
     var length = str.length | 0;
     this.emitU32v(length);

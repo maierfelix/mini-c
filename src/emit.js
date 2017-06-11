@@ -288,8 +288,7 @@ function emitNode(node) {
     let operator = node.operator;
     // 0 - x
     if (operator === "-") {
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU8(0);
+      bytes.emitUi32(0);
       emitNode(node.value);
       bytes.emitU8(WASM_OPCODE_I32_SUB);
     }
@@ -309,8 +308,7 @@ function emitNode(node) {
         node.operator === "++" ? WASM_OPCODE_I32_ADD : WASM_OPCODE_I32_SUB
       );
       emitNode(local);
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.emitU8(1);
+      bytes.emitUi32(1);
       bytes.emitU8(op);
       bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
       bytes.writeVarUnsigned(resolve.offset);
@@ -339,47 +337,183 @@ function emitAssignment(node) {
     __imports.error("Invalid left-hand side in assignment");
   }
   let resolve = scope.resolve(node.left.value);
-  // prepare variable to load from memory
-  if (resolve.isMemoryLocated) {
-    if (resolve.isParameter) {
-      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-      bytes.writeVarUnsigned(resolve.index);
-    } else {
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.writeVarUnsigned(resolve.offset);
-    }
-  }
-  // assignment to a pointer's adress
-  if (resolve.isPointer && !insideVariableDeclaration && !resolve.isParameter) {
-    console.log("Assignment to pointer", resolve.id, ":", resolve.offset);
-    emitNode(node.right);
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
-    return;
-  }
+  // deep assignment
   if (node.right.operator === "=") {
     emitNode(node.right);
     emitNode(node.right.left);
-  } else {
-    emitNode(node.right);
+    return;
   }
-  // assign to memory located variable
-  if (resolve.isMemoryLocated) {
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
+  // pointer gets manually assigned something after initialisation
+  // also the pointer to assign to is a parameter
+  if (resolve.isPointer && resolve.isParameter) {
+    // get the passed in pointer adress
+    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+    bytes.writeVarUnsigned(resolve.index);
+    bytes.emitUi32(4);
+    bytes.emitU8(WASM_OPCODE_I32_ADD);
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // i32
     bytes.writeVarUnsigned(0);
-  // assign to local variable
-  } else {
-    if (resolve.isGlobal) {
-      bytes.emitU8(WASM_OPCODE_SET_GLOBAL);
-    } else {
-      bytes.emitU8(WASM_OPCODE_SET_LOCAL);
-    }
+    emitNode(node.right);
+    // store it
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
+    return;
+  }
+  // pointer gets manually assigned something after initialisation
+  if (resolve.isPointer) {
+    bytes.emitUi32(resolve.offset);
+    emitNode(node.right);
+    // store it
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
+    return;
+  }
+  // variable assignment
+  emitNode(node.right);
+};
+
+function emitIdentifier(node) {
+  let resolve = scope.resolve(node.value);
+  // global variable
+  if (resolve.isGlobal) {
+    bytes.emitU8(WASM_OPCODE_GET_GLOBAL);
     bytes.writeVarUnsigned(resolve.index);
+  }
+  // adress-of identifier
+  else if (node.isReference) {
+    if (resolve.isGlobal) {
+      __imports.error("Taking adress of global variable", node.value ," isnt supported!");
+    }
+    // pointer variable
+    else if (resolve.isPointer) {
+      // push the pointer's adress
+      bytes.emitUi32(resolve.offset);
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+      // now pop and load the real pointer's adress
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+    }
+    // variable
+    else {
+      // just push the static variable's adress offset
+      bytes.emitUi32(resolve.offset);
+    }
+  }
+  // handle pointer parameter
+  else if (resolve.isPointer && resolve.isParameter) {
+    if (node.isDereference) {
+      // get the passed in pointer adress
+      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+      bytes.writeVarUnsigned(resolve.index);
+      // add 4 bytes to get the real pointer's adress
+      bytes.emitUi32(4);
+      bytes.emitU8(WASM_OPCODE_I32_ADD);
+      // load this adress
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+    } else {
+      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+      bytes.writeVarUnsigned(resolve.index);
+    }
+  }
+  // value-of identifier
+  else if (node.isDereference) {
+    // take value where pointer points to
+    if (resolve.isPointer) {
+      bytes.emitUi32(resolve.offset);
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+      // pointer value at ptr adress + 4
+      bytes.emitUi32(4);
+      bytes.emitU8(WASM_OPCODE_I32_ADD);
+      // now pop and load the real pointer's adress
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+      // now push the pointers pointed value
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+    }
+    // invalid ?
+    else {
+      __imports.error("Unsupported dereference to", node.value);
+    }
+  }
+  // pointer variable
+  else if (resolve.isPointer) {
+    // push the pointer's adress
+    bytes.emitUi32(resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+    // now pop and load the real pointer's adress
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+  }
+  // variable
+  else {
+    bytes.emitUi32(resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+  }
+};
+
+function emitVariableDeclaration(node) {
+  let resolve = scope.resolve(node.id);
+  let storeInMemory = resolve.isMemoryLocated;
+  node.offset = currentHeapOffset;
+  // store pointer
+  // +0 = pointer adress, +4 = adress pointed to
+  if (resolve.isPointer) {
+    console.log("Store pointer variable", node.id, "in memory at", resolve.offset);
+    // # store the pointer adress
+    // offset
+    bytes.emitUi32(resolve.offset);
+    growHeap(4);
+    // value
+    bytes.emitUi32(resolve.offset);
+    // store it
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
+    // # store the pointer value
+    // offset
+    bytes.emitUi32(resolve.offset + 4);
+    // value
+    // manually emit, dont allow deep assignments here
+    emitNode(node.init.right);
+    // store it
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
+    growHeap(4);
+  }
+  // store variable
+  else {
+    console.log("Store variable", node.id, "in memory at", resolve.offset);
+    // offset
+    bytes.emitUi32(resolve.offset);
+    growHeap(4);
+    // value
+    emitNode(node.init);
+    // store
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
   }
 };
 
@@ -394,104 +528,24 @@ function getLoopDepthIndex() {
   return (label);
 };
 
-let insideVariableDeclaration = false;
-function emitVariableDeclaration(node) {
-  let resolve = scope.resolve(node.id);
-  let storeInMemory = resolve.isMemoryLocated;
-  if (storeInMemory) {
-    node.offset = currentHeapOffset;
-    console.log("Store variable", node.id, "in memory at", node.offset);
-    growHeap(4);
-    // initialise
-    insideVariableDeclaration = true;
-    emitNode(node.init);
-    insideVariableDeclaration = false;
-  } else {
-    //console.log("Store variable", node.id, "in local stack at", resolve.index);
-    // default initialisation with zero
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(0);
-    bytes.emitU8(WASM_OPCODE_SET_LOCAL);
-    bytes.writeVarUnsigned(resolve.index);
-    // emit final initialisation
-    emitNode(node.init);
-  }
-};
-
-function emitIdentifier(node) {
-  let resolve = scope.resolve(node.value);
-  if (node.isReference) {
-    //console.log("Load memory location of", node.value, ":", resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.writeVarUnsigned(resolve.offset);
-  }
-  // gets dereferenced
-  else if (node.isDereference) {
-    if (resolve.isParameter) {
-      //console.log("Dereference parameter", resolve.index);
-      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-      bytes.writeVarUnsigned(resolve.index);
-    } else {
-      // load pointer adress
-      bytes.emitU8(WASM_OPCODE_I32_CONST);
-      bytes.writeVarUnsigned(resolve.offset);
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
-    }
-    // load pointed variable value
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
-  }
-  else if (resolve.isPointer) {
-    console.log("Load adress of pointer", node.value, ":", resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.writeVarUnsigned(resolve.offset);
-  }
-  // stored inside memory
-  else if (resolve.isMemoryLocated) {
-    console.log("Load value of", node.value, "from memory at:", resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.writeVarUnsigned(resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
-  }
-  // local resolve
-  else {
-    if (resolve.isGlobal) {
-      bytes.emitU8(WASM_OPCODE_GET_GLOBAL);
-    } else {
-      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-      //console.log("Load local value", node.value);
-    }
-    bytes.writeVarUnsigned(resolve.index);
-  }
-};
-
 function emitPostfixExpression(node) {
   let local = node.value;
   let resolve = scope.resolve(local.value);
   if (node.operator === "++") {
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(1);
+    bytes.emitUi32(1);
     emitIdentifier(local);
     bytes.emitU8(WASM_OPCODE_I32_ADD);
     bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
     bytes.writeVarUnsigned(resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(1);
+    bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_SUB);
   } else if (node.operator === "--") {
     emitIdentifier(local);
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(1);
+    bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_SUB);
     bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
     bytes.writeVarUnsigned(resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_CONST);
-    bytes.emitU8(1);
+    bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_ADD);
   }
 };
