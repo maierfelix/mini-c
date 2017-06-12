@@ -9,9 +9,7 @@ i32 swap(i32 *c, i32 *d) {
 i32 main() {
   i32 a = 42;
   i32 b = 66;
-  i32 *ptrA = &a;
-  i32 *ptrB = &b;
-  // ptrA = ptrB; prevents swapping
-  i32 res = swap(ptrA, ptrB);
+  i32 *ptr = &a;
+  swap(ptr, &b);
   return (a);
 };

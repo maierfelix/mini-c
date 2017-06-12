@@ -45,6 +45,8 @@ function isAssignmentOperator(kind) {
 function isUnaryPrefixOperator(token) {
   let kind = token.kind;
   return (
+    kind === Operators.BIN_AND ||
+    kind === Operators.MUL ||
     kind === Operators.SUB ||
     kind === Operators.ADD ||
     kind === Operators.NOT ||
@@ -170,13 +172,16 @@ function parseDeclaration(extern) {
   expectTypeLiteral();
   const type = current.kind;
   next();
-  const isPointer = eat(Operators.MUL);
+  let isPointer = eat(Operators.MUL);
+  // if not pointer, check if &-reference
+  let isReference = false;
+  if (!isPointer) { isReference = eat(Operators.BIN_AND); }
   expectIdentifier();
   const name = current.value;
   next();
   const token = current.kind;
   if (token === Operators.ASS) {
-    node = parseVariableDeclaration(type, name, extern, isPointer);
+    node = parseVariableDeclaration(type, name, extern, isPointer, isReference);
   }
   else if (TokenList.LPAREN) {
     node = parseFunctionDeclaration(type, name, extern);
@@ -321,14 +326,15 @@ function parseFunctionParameters() {
   return (params);
 };
 
-function parseVariableDeclaration(type, name, extern, isPointer) {
+function parseVariableDeclaration(type, name, extern, isPointer, isReference) {
   let node = {
     kind: Nodes.VariableDeclaration,
     type: type,
     id: name,
     init: null,
     isGlobal: false,
-    isPointer
+    isPointer,
+    isReference
   };
   // force pointers to be stored inside memory
   if (isPointer) node.isMemoryLocated = true;

@@ -348,11 +348,6 @@ function emitAssignment(node) {
     // get the passed in pointer address
     bytes.emitU8(WASM_OPCODE_GET_LOCAL);
     bytes.writeVarUnsigned(resolve.index);
-    bytes.emitUi32(4);
-    bytes.emitU8(WASM_OPCODE_I32_ADD);
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
     emitNode(node.right);
     // store it
     bytes.emitU8(WASM_OPCODE_I32_STORE);
@@ -433,13 +428,6 @@ function emitIdentifier(node) {
       // get the passed in pointer address
       bytes.emitU8(WASM_OPCODE_GET_LOCAL);
       bytes.writeVarUnsigned(resolve.index);
-      // add 4 bytes to get the real pointer's address
-      bytes.emitUi32(4);
-      bytes.emitU8(WASM_OPCODE_I32_ADD);
-      // load this address
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
       bytes.emitU8(WASM_OPCODE_I32_LOAD);
       bytes.emitU8(2); // i32
       bytes.writeVarUnsigned(0);
@@ -474,18 +462,26 @@ function emitIdentifier(node) {
     }
   }
   // pointer variable
+  // push the pointers pointed to adress
   else if (resolve.isPointer) {
     // push the pointer's address
     bytes.emitUi32(resolve.offset);
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // i32
     bytes.writeVarUnsigned(0);
+    bytes.emitUi32(4);
+    bytes.emitU8(WASM_OPCODE_I32_ADD);
     // now pop and load the real pointer's address
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // i32
     bytes.writeVarUnsigned(0);
   }
-  // variable
+  // default parameter
+  else if (resolve.isParameter) {
+    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+    bytes.writeVarUnsigned(resolve.index);
+  }
+  // default variable
   else {
     bytes.emitUi32(resolve.offset);
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
