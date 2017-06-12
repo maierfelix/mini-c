@@ -57,5 +57,26 @@ module.exports = [
     };
     return (a);
   };`,
-  `104`
+  `104`,
+  `i32 main() {
+    i32 i = 0;
+    i32 j = ++i;
+    i32 k = i++;
+    return (i);
+  };`,
+  `2`,
+  `i32 main() {
+    i32 i = 0;
+    i32 j = ++i;
+    i32 k = i++;
+    return (j);
+  };`,
+  `1`,
+  `i32 main() {
+    i32 i = 0;
+    i32 j = ++i;
+    i32 k = i++;
+    return (k);
+  };`,
+  `1`
 ];

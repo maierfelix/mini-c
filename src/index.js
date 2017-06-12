@@ -51,7 +51,6 @@ function compile(str, imports) {
       str = code + str;*/
       let tkns = scan(str);
       let ast = parse(tkns);
-      console.log(ast);
       emit(ast);
       let buffer = new Uint8Array(bytes);
       let dump = hexDump(buffer);

@@ -373,23 +373,21 @@ function emitAssignment(node) {
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // i32
     bytes.writeVarUnsigned(0);
+    // jump 4 bytes up to get the pointer's pointed value
+    bytes.emitUi32(4);
+    bytes.emitU8(WASM_OPCODE_I32_ADD);
     // pointer gets assigned some value to the pointed adress
     // [*ptr = x]
     if (target.isDereference) {
-      // jump 4 bytes up to get the pointer's pointed value
-      bytes.emitUi32(4);
-      bytes.emitU8(WASM_OPCODE_I32_ADD);
+      // load that address
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+    } else {
+      // pointer gets assigned some address
+      // [ptr = addr]
     }
-    // pointer gets assigned some address
-    // [ptr = addr]
-    else {
-      // don't add 4 bytes, stay on the pointer's mem address
-    }
-    // load that address
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
-    // set the value to assign
+    // push the adress to assign
     emitNode(node.right);
     // store it
     bytes.emitU8(WASM_OPCODE_I32_STORE);
@@ -594,7 +592,6 @@ function emitPostfixExpression(node) {
     bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_SUB);
   } else if (node.operator === "--") {
-
     // store offset
     bytes.emitUi32(resolve.offset);
     emitIdentifier(local);
@@ -611,7 +608,6 @@ function emitPostfixExpression(node) {
     bytes.writeVarUnsigned(0);
     bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_ADD);
-
   }
 };
 
