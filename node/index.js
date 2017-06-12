@@ -31,7 +31,8 @@ fs.writeFileSync(bin, code, "utf-8");
   );
 })();
 
-let compiler = require(bin);
-let __imports = { error: (msg) => console.log(error) };
-let result = compiler(input, __imports);
-console.log(result.exports.main(2, 2));
+try {
+  require(bin);
+} catch (e) {
+  throw new Error(e);
+};

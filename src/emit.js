@@ -177,7 +177,7 @@ function emitCodeSection(node) {
   size.patch(bytes.length - size.offset);
 };
 
-let currentHeapOffset = 3;
+let currentHeapOffset = 0;
 function growHeap(amount) {
   currentHeapOffset += amount;
 };
@@ -307,11 +307,21 @@ function emitNode(node) {
       let op = (
         node.operator === "++" ? WASM_OPCODE_I32_ADD : WASM_OPCODE_I32_SUB
       );
+      bytes.emitUi32(resolve.offset);
       emitNode(local);
       bytes.emitUi32(1);
       bytes.emitU8(op);
-      bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
-      bytes.writeVarUnsigned(resolve.offset);
+      //bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
+      //bytes.writeVarUnsigned(resolve.offset);
+      // store it
+      bytes.emitU8(WASM_OPCODE_I32_STORE);
+      bytes.emitU8(2); // i32
+      bytes.emitU8(0);
+      bytes.emitUi32(resolve.offset);
+      // tee_local with load
+      bytes.emitU8(WASM_OPCODE_I32_LOAD);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
     }
   }
   else if (kind === Nodes.UnaryPostfixExpression) {
@@ -386,9 +396,22 @@ function emitAssignment(node) {
     bytes.emitU8(2); // i32
     bytes.emitU8(0);
   }
+  else if (resolve.isGlobal) {
+    emitNode(node.right);
+    bytes.emitU8(WASM_OPCODE_SET_GLOBAL);
+    bytes.writeVarUnsigned(resolve.index);
+  }
   // just a default variable assignment
   else {
-    emitNode(node.right);
+    if (insideVariableDeclaration) {
+      emitNode(node.right);
+    } else {
+      bytes.emitUi32(resolve.offset);
+      emitNode(node.right);
+      bytes.emitU8(WASM_OPCODE_I32_STORE);
+      bytes.emitU8(2); // i32
+      bytes.writeVarUnsigned(0);
+    }
   }
 };
 
@@ -490,6 +513,7 @@ function emitIdentifier(node) {
   }
 };
 
+let insideVariableDeclaration = false;
 function emitVariableDeclaration(node) {
   let resolve = scope.resolve(node.id);
   let storeInMemory = resolve.isMemoryLocated;
@@ -497,7 +521,7 @@ function emitVariableDeclaration(node) {
   // store pointer
   // +0 = pointer address, +4 = address pointed to
   if (resolve.isPointer) {
-    console.log("Store pointer variable", node.id, "in memory at", resolve.offset);
+    __imports.log("Store pointer variable", node.id, "in memory at", resolve.offset);
     // # store the pointer address
     // offset
     bytes.emitUi32(resolve.offset);
@@ -522,12 +546,14 @@ function emitVariableDeclaration(node) {
   }
   // store variable
   else {
-    console.log("Store variable", node.id, "in memory at", resolve.offset);
+    __imports.log("Store variable", node.id, "in memory at", resolve.offset);
     // offset
     bytes.emitUi32(resolve.offset);
     growHeap(4);
     // value
+    insideVariableDeclaration = true;
     emitNode(node.init);
+    insideVariableDeclaration = false;
     // store
     bytes.emitU8(WASM_OPCODE_I32_STORE);
     bytes.emitU8(2); // i32
@@ -550,21 +576,42 @@ function emitPostfixExpression(node) {
   let local = node.value;
   let resolve = scope.resolve(local.value);
   if (node.operator === "++") {
+    // store offset
+    bytes.emitUi32(resolve.offset);
+    // value to store
     bytes.emitUi32(1);
     emitIdentifier(local);
     bytes.emitU8(WASM_OPCODE_I32_ADD);
-    bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
-    bytes.writeVarUnsigned(resolve.offset);
+    // pop store
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
+    bytes.emitUi32(resolve.offset);
+    // tee_local with load
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
     bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_SUB);
   } else if (node.operator === "--") {
+
+    // store offset
+    bytes.emitUi32(resolve.offset);
     emitIdentifier(local);
     bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_SUB);
-    bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
-    bytes.writeVarUnsigned(resolve.offset);
+    // pop store
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
+    bytes.emitUi32(resolve.offset);
+    // tee_local with load
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
     bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_ADD);
+
   }
 };
 

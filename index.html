@@ -54,10 +54,12 @@
         buffer.value = output.value = "";
         let code = doc.getValue();
         let _import = {
-          error: (msg) => { throw new Error(msg) }
+          error: (msg) => { throw new Error(msg) },
+          log: function() { console.log.apply(console, arguments); }
         };
         let cnow = performance.now();
         compile(code, _import).then((result) => {
+          console.log(result.ast);
           let cthen = performance.now();
           buffer.value = result.dump;
           let main = result.exports.main;

@@ -9,4 +9,4 @@ module.exports = [
     return (fact(4));
   };`,
   `24`
-;
+];
