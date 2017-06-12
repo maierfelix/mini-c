@@ -17,9 +17,23 @@ function hexDump(array) {
   return (result);
 };
 
+function memoryDump(array, limit) {
+  let str = "";
+  for (let ii = 0; ii < limit; ii += 4) {
+    str += ii;
+    str += ": ";
+    str += array[ii + 0] + ", ";
+    str += array[ii + 1] + ", ";
+    str += array[ii + 2] + ", ";
+    str += array[ii + 3] + " ";
+    str += "\n";
+  };
+  return (str);
+};
+
 function loadStdlib() {
   return new Promise((resolve, reject) => {
-    fetch("./stdlib/memory.momo").then((resp) => resp.text().then((txt) => {
+    fetch("../stdlib/memory.momo").then((resp) => resp.text().then((txt) => {
       resolve(txt);
     }));
   });
@@ -33,11 +47,11 @@ function compile(str, imports) {
   __imports = imports;
   currentHeapOffset = 0;
   return new Promise((resolve, reject) => {
-    loadStdlib().then((code) => {
-      str = code + str;
+    /*loadStdlib().then((code) => {
+      str = code + str;*/
       let tkns = scan(str);
       let ast = parse(tkns);
-      //console.log(ast);
+      console.log(ast);
       emit(ast);
       let buffer = new Uint8Array(bytes);
       let dump = hexDump(buffer);
@@ -53,7 +67,7 @@ function compile(str, imports) {
         };
         resolve(output);
       });
-    });
+    /*});*/
   });
 };
 

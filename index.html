@@ -12,7 +12,7 @@
     <script type="text/javascript" src="src/emit.js"></script>
     <script type="text/javascript" src="src/index.js"></script>
   </head>
-    <body>
+  <body>
     <div id="code"></div>
 
     <textarea id="buffer"></textarea>
@@ -49,6 +49,7 @@
     <i id="elapsed"></i>
 
     <script>
+      window.memoryDumpLimit = 32;
       cmp.onclick = (e) => {
         buffer.value = output.value = "";
         let code = doc.getValue();
@@ -66,7 +67,8 @@
           let then = performance.now();
           let time = String(then - now).slice(0, 8);
           let ctime = String(cthen - cnow).slice(0, 8);
-          console.log(memory);
+          //console.log(memory);
+          console.log(memoryDump(memory, window.memoryDumpLimit));
           celapsed.innerHTML = "Compiled in: " + ctime + "ms";
           elapsed.innerHTML = "Executed in: " + time + "ms";
           output.value = "=> " + out;
@@ -85,13 +87,13 @@
         margin-left: 5px;
       }
       #code {
-        width: 364px;
+        width: 420px;
         float: left;
         height: 290px;
       }
       #cmp {
         position: absolute;
-        left: 304px;
+        left: 360px;
         top: 276px;
       }
       #celapsed {
