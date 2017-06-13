@@ -311,8 +311,6 @@ function emitNode(node) {
       emitNode(local);
       bytes.emitUi32(1);
       bytes.emitU8(op);
-      //bytes.emitU8(WASM_OPCODE_TEE_LOCAL);
-      //bytes.writeVarUnsigned(resolve.offset);
       // store it
       bytes.emitU8(WASM_OPCODE_I32_STORE);
       bytes.emitU8(2); // i32
@@ -322,6 +320,12 @@ function emitNode(node) {
       bytes.emitU8(WASM_OPCODE_I32_LOAD);
       bytes.emitU8(2); // i32
       bytes.writeVarUnsigned(0);
+    }
+    else if (operator === "&") {
+      emitReference(node);
+    }
+    else if (operator === "*") {
+      emitDereference(node);
     }
   }
   else if (kind === Nodes.UnaryPostfixExpression) {
@@ -342,22 +346,24 @@ function emitNode(node) {
   }
 };
 
+function emitReference(node) {
+  let lvalue = node.value;
+  let resolve = scope.resolve(lvalue.value);
+  bytes.emitUi32(resolve.offset);
+};
+
+function emitDereference(node) {
+  emitNode(node.value);
+  bytes.emitU8(WASM_OPCODE_I32_LOAD);
+  bytes.emitU8(2); // i32
+  bytes.writeVarUnsigned(0);
+};
+
 function emitAssignment(node) {
-  if (node.left.kind !== Nodes.Literal) {
-    __imports.error("Invalid left-hand side in assignment");
-  }
   let target = node.left;
-  let resolve = scope.resolve(target.value);
-  // deep assignment
-  if (node.right.operator === "=") {
-    emitNode(node.right);
-    emitNode(node.right.left);
-  }
-  // the pointer to assign to is a parameter
-  else if (resolve.isPointer && resolve.isParameter) {
-    // get the passed in pointer address
-    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-    bytes.writeVarUnsigned(resolve.index);
+  if (node.left.operator === "*") {
+    emitNode(node.left.value);
+    // push the adress to assign
     emitNode(node.right);
     // store it
     bytes.emitU8(WASM_OPCODE_I32_STORE);
@@ -365,34 +371,11 @@ function emitAssignment(node) {
     bytes.emitU8(0);
     return;
   }
-  // a pointer gets assigned something
-  else if (resolve.isPointer) {
-    // go to pointer's address
-    bytes.emitUi32(resolve.offset);
-    // take the address the pointer is located
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
-    // jump 4 bytes up to get the pointer's pointed value
-    bytes.emitUi32(4);
-    bytes.emitU8(WASM_OPCODE_I32_ADD);
-    // pointer gets assigned some value to the pointed adress
-    // [*ptr = x]
-    if (target.isDereference) {
-      // load that address
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
-    } else {
-      // pointer gets assigned some address
-      // [ptr = addr]
-    }
-    // push the adress to assign
+  let resolve = scope.resolve(node.left.value);
+  // deep assignment
+  if (node.right.operator === "=") {
     emitNode(node.right);
-    // store it
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
+    emitNode(node.right.left);
   }
   else if (resolve.isGlobal) {
     emitNode(node.right);
@@ -420,67 +403,10 @@ function emitIdentifier(node) {
     bytes.emitU8(WASM_OPCODE_GET_GLOBAL);
     bytes.writeVarUnsigned(resolve.index);
   }
-  // address-of identifier
-  else if (node.isReference) {
-    if (resolve.isGlobal) {
-      __imports.error("Taking address of global variable", node.value ," isnt supported!");
-    }
-    // pointer variable
-    else if (resolve.isPointer) {
-      // push the pointer's address
-      bytes.emitUi32(resolve.offset);
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
-      // now pop and load the real pointer's address
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
-    }
-    // variable
-    else {
-      // just push the static variable's address offset
-      bytes.emitUi32(resolve.offset);
-    }
-  }
   // handle pointer parameter
-  else if (resolve.isPointer && resolve.isParameter) {
-    if (node.isDereference) {
-      // get the passed in pointer address
-      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-      bytes.writeVarUnsigned(resolve.index);
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
-    } else {
-      bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-      bytes.writeVarUnsigned(resolve.index);
-    }
-  }
-  // value-of identifier
-  else if (node.isDereference) {
-    // take value where pointer points to
-    if (resolve.isPointer) {
-      bytes.emitUi32(resolve.offset);
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
-      // pointer value at ptr address + 4
-      bytes.emitUi32(4);
-      bytes.emitU8(WASM_OPCODE_I32_ADD);
-      // now pop and load the real pointer's address
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
-      // now push the pointers pointed value
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
-    }
-    // invalid ?
-    else {
-      __imports.error("Unsupported dereference to", node.value);
-    }
+  else if (resolve.isParameter) {
+    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+    bytes.writeVarUnsigned(resolve.index);
   }
   // pointer variable
   // push the pointers pointed to adress
@@ -490,17 +416,6 @@ function emitIdentifier(node) {
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // i32
     bytes.writeVarUnsigned(0);
-    bytes.emitUi32(4);
-    bytes.emitU8(WASM_OPCODE_I32_ADD);
-    // now pop and load the real pointer's address
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
-  }
-  // default parameter
-  else if (resolve.isParameter) {
-    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-    bytes.writeVarUnsigned(resolve.index);
   }
   // default variable
   else {
@@ -520,27 +435,18 @@ function emitVariableDeclaration(node) {
   // +0 = pointer address, +4 = address pointed to
   if (resolve.isPointer) {
     __imports.log("Store pointer variable", node.id, "in memory at", resolve.offset);
-    // # store the pointer address
+    // # store the pointed adress
     // offset
     bytes.emitUi32(resolve.offset);
     growHeap(4);
     // value
-    bytes.emitUi32(resolve.offset);
-    // store it
+    insideVariableDeclaration = true;
+    emitNode(node.init);
+    insideVariableDeclaration = false;
+    // store
     bytes.emitU8(WASM_OPCODE_I32_STORE);
     bytes.emitU8(2); // i32
     bytes.emitU8(0);
-    // # store the pointer value
-    // offset
-    bytes.emitUi32(resolve.offset + 4);
-    // value
-    // manually emit, dont allow deep assignments here
-    emitNode(node.init.right);
-    // store it
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
-    growHeap(4);
   }
   // store variable
   else {

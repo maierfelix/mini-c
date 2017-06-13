@@ -152,6 +152,15 @@ module.exports = [
     return (*ptrB);
   };`,
   `66`,
+  `i32 main() {
+    i32 a = 42;
+    i32 b = 66;
+    i32 *ptrA = &a;
+    i32 *ptrB = &b;
+    *ptrB = 77;
+    return (*ptrB + b);
+  };`,
+  `154`,
   `i32 swap(i32 *c, i32 *d) {
     i32 *e = c;
     *(*(&e)) = *d;
@@ -161,9 +170,9 @@ module.exports = [
   i32 main() {
     i32 a = 42;
     i32 b = 66;
-    i32 *ptrB = &b;
-    i32 res = swap(&a, ptrB);
-    return ((*(&a)) + a + b);
+    i32 *ptr = &b;
+    i32 res = swap(&a, ptr);
+    return ((*(&a)) + b);
   };`,
-  `198`
+  `132`
 ];

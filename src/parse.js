@@ -456,24 +456,6 @@ function parsePrefix() {
     expect(TokenList.RPAREN);
     return (node);
   }
-  if (current.kind === Operators.MUL) {
-    next();
-    expectIdentifier();
-    let node = parseLiteral();
-    let resolve = scope.resolve(node.value);
-    node.isDereference = true;
-    resolve.isMemoryLocated = true;
-    return (node);
-  }
-  if (current.kind === Operators.BIN_AND) {
-    next();
-    expectIdentifier();
-    let node = parseLiteral();
-    let resolve = scope.resolve(node.value);
-    node.isReference = true;
-    resolve.isMemoryLocated = true;
-    return (node);
-  }
   if (isUnaryPrefixOperator(current)) {
     return (parseUnaryPrefixExpression());
   }
