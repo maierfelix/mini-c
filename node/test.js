@@ -33,12 +33,12 @@ sources.forEach((sauce) => {
       let expected = mod[ii + 1];
       ((index) => {
         let _import = {
-          error: (msg) => { errors++; }, log: () => {}
+          error: (msg) => { console.log(name + ":" + index + ":", msg); errors++; }, log: () => {}
         };
         compiler(input, _import).then((result) => {
           let out = result.exports.main(2, 2);
           if (String(out) !== String(expected)) {
-            console.log(name + ":", out, "=>", expected);
+            console.log(name + ":" + index + ":", out, "=>", expected);
             passed--;
           }
           if (errors > 0) {

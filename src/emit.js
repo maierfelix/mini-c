@@ -361,6 +361,7 @@ function emitDereference(node) {
 
 function emitAssignment(node) {
   let target = node.left;
+  // assignment to pointer
   if (node.left.operator === "*") {
     emitNode(node.left.value);
     // push the adress to assign
@@ -377,9 +378,26 @@ function emitAssignment(node) {
     emitNode(node.right);
     emitNode(node.right.left);
   }
+  // reference variable
+  else if (!insideVariableDeclaration && resolve.isReference && !resolve.isParameter) {
+    emitNode(node.left);
+    // push the adress to assign
+    emitNode(node.right);
+    // store it
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
+  }
+  // global variable
   else if (resolve.isGlobal) {
     emitNode(node.right);
     bytes.emitU8(WASM_OPCODE_SET_GLOBAL);
+    bytes.writeVarUnsigned(resolve.index);
+  }
+  // default parameter kind
+  else if (resolve.isParameter && !resolve.isReference) {
+    emitNode(node.right);
+    bytes.emitU8(WASM_OPCODE_SET_LOCAL);
     bytes.writeVarUnsigned(resolve.index);
   }
   // just a default variable assignment
@@ -398,8 +416,15 @@ function emitAssignment(node) {
 
 function emitIdentifier(node) {
   let resolve = scope.resolve(node.value);
+  if (resolve.isReference && resolve.isParameter) {
+    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+    bytes.writeVarUnsigned(resolve.index);
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
+  }
   // global variable
-  if (resolve.isGlobal) {
+  else if (resolve.isGlobal) {
     bytes.emitU8(WASM_OPCODE_GET_GLOBAL);
     bytes.writeVarUnsigned(resolve.index);
   }
@@ -407,6 +432,13 @@ function emitIdentifier(node) {
   else if (resolve.isParameter) {
     bytes.emitU8(WASM_OPCODE_GET_LOCAL);
     bytes.writeVarUnsigned(resolve.index);
+  }
+  // reference variable
+  else if (resolve.isReference && !resolve.isParameter) {
+    bytes.emitUi32(resolve.offset);
+    bytes.emitU8(WASM_OPCODE_I32_LOAD);
+    bytes.emitU8(2); // i32
+    bytes.writeVarUnsigned(0);
   }
   // pointer variable
   // push the pointers pointed to adress
@@ -433,7 +465,7 @@ function emitVariableDeclaration(node) {
   node.offset = currentHeapOffset;
   // store pointer
   // +0 = pointer address, +4 = address pointed to
-  if (resolve.isPointer) {
+  if (resolve.isPointer || resolve.isReference) {
     __imports.log("Store pointer variable", node.id, "in memory at", resolve.offset);
     // # store the pointed adress
     // offset

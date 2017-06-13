@@ -312,6 +312,8 @@ function parseFunctionParameters() {
     const type = current.kind;
     next();
     let isPointer = eat(Operators.MUL);
+    let isReference = false;
+    if (!isPointer) { isReference = eat(Operators.BIN_AND); }
     expectIdentifier();
     params.push(current);
     let param = params[params.length - 1];
@@ -319,6 +321,7 @@ function parseFunctionParameters() {
     param.kind = Nodes.Parameter;
     param.isParameter = true;
     param.isPointer = isPointer;
+    param.isReference = isReference;
     next();
     if (!eat(TokenList.COMMA)) break;
   };
@@ -346,6 +349,15 @@ function parseVariableDeclaration(type, name, extern, isPointer, isReference) {
     node.isGlobal = true;
   }
   expect(Operators.ASS);
+  let init = parseExpression(Operators.LOWEST);
+  // => reference wrapper
+  if (isReference) {
+    init = {
+      kind: Nodes.UnaryPrefixExpression,
+      operator: "&",
+      value: init
+    };
+  }
   node.init = {
     kind: Nodes.BinaryExpression,
     left: {
@@ -353,7 +365,7 @@ function parseVariableDeclaration(type, name, extern, isPointer, isReference) {
       type: Token.Identifier,
       value: node.id
     },
-    right: parseExpression(Operators.LOWEST),
+    right: init,
     operator: "="
   };
   if (!node.isGlobal) {
@@ -367,19 +379,32 @@ function parseCallExpression(id) {
   let node = {
     kind: Nodes.CallExpression,
     callee: id,
-    parameter: parseCallParameters()
+    parameter: parseCallParameters(id.value)
   };
   return (node);
 };
 
-function parseCallParameters() {
+function parseCallParameters(id) {
   let params = [];
+  let callee = scope.resolve(id);
   expect(TokenList.LPAREN);
+  let index = 0;
   while (true) {
+    let isReference = callee.parameter[index].isReference;
     if (peek(TokenList.RPAREN)) break;
     let expr = parseExpression(Operators.LOWEST);
+    // called functions parameter expects reference
+    if (isReference && expr.kind === Nodes.Literal) {
+      // wrap pass-by-reference node around passed in expression
+      expr = {
+        kind: Nodes.UnaryPrefixExpression,
+        operator: "&",
+        value: expr
+      };
+    }
     params.push(expr);
     if (!eat(TokenList.COMMA)) break;
+    index++;
   };
   expect(TokenList.RPAREN);
   return (params);

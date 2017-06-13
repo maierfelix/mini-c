@@ -42,6 +42,23 @@ module.exports = [
     return (*ptrA);
   };`,
   `66`,
+  `i32 swap(i32 *c, i32 *d) {
+    i32 tmp = *c;
+    *c = *d;
+    *d = tmp;
+    return (0);
+  };
+  i32 main() {
+    i32 a = 42;
+    i32 c = 55;
+    i32 b = 66;
+    i32 *ptrA = &a;
+    i32 *ptrC = &c;
+    i32 *ptrB = &b;
+    i32 res = swap(ptrA, &b);
+    return (*ptrA);
+  };`,
+  `66`,
   `export i32 main() {
     i32 a = 10;
     i32 b = 20;
@@ -174,5 +191,97 @@ module.exports = [
     i32 res = swap(&a, ptr);
     return ((*(&a)) + b);
   };`,
-  `132`
+  `132`,
+  `i32 af(i32 &g) {
+    g++;
+    return (0);
+  };
+  i32 main() {
+    i32 g = 123;
+    i32 res = af(g);
+    return (g);
+  };
+  `,
+  `124`,
+  `i32 test(i32 h) {
+    h++;
+    h += 1;
+    return (0);
+  };
+  i32 main() {
+    i32 g = 123;
+    i32 res = test(g);
+    return (g);
+  };
+  `,
+  `123`,
+  `i32 af(i32 &g) {
+    g = 42;
+    return (0);
+  };
+  i32 main() {
+    i32 g = 123;
+    i32 res = af(g);
+    return (g);
+  };`,
+  `42`,
+  `i32 af(i32 &g) {
+    g = g + 1;
+    g += 1;
+    g++;
+    --g;
+    g++;
+    return (0);
+  };
+  i32 main() {
+    i32 g = 123;
+    i32 res = af(g);
+    return (g);
+  };`,
+  `126`,
+  `i32 test(i32 &h) {
+    h += 1;
+    h = h + 2;
+    h *= 2;
+    return (0);
+  };
+  i32 main() {
+    i32 g = 123;
+    i32 res = test(g);
+    return (g);
+  };`,
+  `252`,
+  `i32 af(i32 &g) {
+    g = g + 1;
+    g += 1;
+    g++;
+    g++;
+    ++g;
+    g--;
+    ++g;
+    return (0);
+  };
+  i32 main() {
+    i32 g = 123;
+    i32 res = af(g);
+    return (g);
+  };`,
+  `128`,
+  `i32 main() {
+    i32  a = 300;
+    i32  b = 400;
+    i32 &c = a;
+    i32  d = 500;
+    return (c == &a);
+  };`,
+  `1`,
+  `i32 main() {
+    i32  a = 300;
+    i32  b = 400;
+    i32 &c = a;
+    i32  d = 500;
+    c = 42;
+    return (*c + a);
+  };`,
+  `84`
 ];
