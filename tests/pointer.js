@@ -181,7 +181,6 @@ module.exports = [
   `i32 swap(i32 *c, i32 *d) {
     i32 *e = c;
     *(*(&e)) = *d;
-    **&e = *d;
     return (0);
   };
   i32 main() {
@@ -192,96 +191,50 @@ module.exports = [
     return ((*(&a)) + b);
   };`,
   `132`,
-  `i32 af(i32 &g) {
-    g++;
-    return (0);
-  };
-  i32 main() {
-    i32 g = 123;
-    i32 res = af(g);
-    return (g);
-  };
-  `,
-  `124`,
-  `i32 test(i32 h) {
-    h++;
-    h += 1;
-    return (0);
-  };
-  i32 main() {
-    i32 g = 123;
-    i32 res = test(g);
-    return (g);
-  };
-  `,
-  `123`,
-  `i32 af(i32 &g) {
-    g = 42;
-    return (0);
-  };
-  i32 main() {
-    i32 g = 123;
-    i32 res = af(g);
-    return (g);
-  };`,
-  `42`,
-  `i32 af(i32 &g) {
-    g = g + 1;
-    g += 1;
-    g++;
-    --g;
-    g++;
-    return (0);
-  };
-  i32 main() {
-    i32 g = 123;
-    i32 res = af(g);
-    return (g);
-  };`,
-  `126`,
-  `i32 test(i32 &h) {
-    h += 1;
-    h = h + 2;
-    h *= 2;
-    return (0);
-  };
-  i32 main() {
-    i32 g = 123;
-    i32 res = test(g);
-    return (g);
-  };`,
-  `252`,
-  `i32 af(i32 &g) {
-    g = g + 1;
-    g += 1;
-    g++;
-    g++;
-    ++g;
-    g--;
-    ++g;
-    return (0);
-  };
-  i32 main() {
-    i32 g = 123;
-    i32 res = af(g);
-    return (g);
-  };`,
-  `128`,
   `i32 main() {
-    i32  a = 300;
-    i32  b = 400;
-    i32 &c = a;
-    i32  d = 500;
-    return (c == &a);
+    i32 num = 10;
+    i32 *ptr1 = &num;
+    i32 *ptr2 = &ptr1;
+    return (**ptr2 == *ptr1);
   };`,
   `1`,
   `i32 main() {
-    i32  a = 300;
-    i32  b = 400;
-    i32 &c = a;
-    i32  d = 500;
-    c = 42;
-    return (*c + a);
+    i32 x = 0;
+    i32 y = 0;
+    i32 *p = &x;
+    i32 *q = &y;
+    i32 *pp = &p;
+    pp = &q;
+    **pp = 4;
+    return (y == 4 && x == 0);
+  };
+  `,
+  `1`,
+  `int main() {
+    int a = 100;
+    int *ptr = &a;
+    return ((&ptr != &a) && ptr == &a);
+  };
+  `,
+  `1`,
+  `i32 main() {
+    i32 b = 66;
+    i32 *ptr = &b;
+    return ((&*ptr) == &b);
   };`,
-  `84`
+  `1`,
+  `i32 main() {
+    i32 a = 66;
+    i32 b = 77;
+    i32 *ptr = &b;
+    return (&*ptr == &b);
+  };`,
+  `1`,
+  `i32 main() {
+    i32 x = 7;
+    i32 a = 66;
+    i32 *ptr = &a;
+    return (*&ptr == &*ptr);
+  };`,
+  `1`
 ];

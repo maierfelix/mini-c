@@ -346,12 +346,44 @@ function emitNode(node) {
   }
 };
 
-function emitReference(node) {
-  let lvalue = node.value;
-  let resolve = scope.resolve(lvalue.value);
-  bytes.emitUi32(resolve.offset);
+// expect var|&
+function resolveLValue(node) {
+  if (node.kind === Nodes.UnaryPrefixExpression) {
+    return (resolveLValue(node.value));
+  }
+  return (node);
 };
 
+// lvalue á &var &(var)
+function emitReference(node) {
+  let lvalue = resolveLValue(node);
+  let resolve = scope.resolve(lvalue.value);
+  // &ptr?
+  if (resolve.isPointer) {
+    let value = node.value;
+    // &ptr
+    if (value.type === Token.Identifier) {
+      bytes.emitUi32(resolve.offset);
+    }
+    // &*ptr
+    else if (value.operator === "*") {
+      emitNode(lvalue);
+    }
+    else {
+      __imports.log("Unsupported adress-of value", getLabelName(value.kind));
+    }
+  }
+  // emit the reference's &(init)
+  else if (resolve.isAlias) {
+    emitNode(resolve.aliasReference);
+  }
+  // default variable, emit it's address
+  else {
+    bytes.emitUi32(resolve.offset);
+  }
+};
+
+// *var *(*expr)
 function emitDereference(node) {
   emitNode(node.value);
   bytes.emitU8(WASM_OPCODE_I32_LOAD);
@@ -359,17 +391,22 @@ function emitDereference(node) {
   bytes.writeVarUnsigned(0);
 };
 
+// *ptr = node
+function emitPointerAssignment(node) {
+  emitNode(node.left.value);
+  // push the adress to assign
+  emitNode(node.right);
+  // store it
+  bytes.emitU8(WASM_OPCODE_I32_STORE);
+  bytes.emitU8(2); // i32
+  bytes.emitU8(0);
+};
+
 function emitAssignment(node) {
   let target = node.left;
-  // assignment to pointer
+  // special case, pointer assignment
   if (node.left.operator === "*") {
-    emitNode(node.left.value);
-    // push the adress to assign
-    emitNode(node.right);
-    // store it
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
+    emitPointerAssignment(node);
     return;
   }
   let resolve = scope.resolve(node.left.value);
@@ -378,29 +415,31 @@ function emitAssignment(node) {
     emitNode(node.right);
     emitNode(node.right.left);
   }
-  // reference variable
-  else if (!insideVariableDeclaration && resolve.isReference && !resolve.isParameter) {
-    emitNode(node.left);
-    // push the adress to assign
-    emitNode(node.right);
-    // store it
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
-  }
   // global variable
   else if (resolve.isGlobal) {
     emitNode(node.right);
     bytes.emitU8(WASM_OPCODE_SET_GLOBAL);
     bytes.writeVarUnsigned(resolve.index);
   }
-  // default parameter kind
-  else if (resolve.isParameter && !resolve.isReference) {
+  // assign to alias variable
+  else if (resolve.isAlias) {
+    // *ptr | b
+    // = 
+    // node
+    emitNode({
+      kind: Nodes.BinaryExpression,
+      operator: "=",
+      left: resolve.aliasValue,
+      right: node.right
+    });
+  }
+  // assign to default parameter
+  else if (resolve.isParameter && !resolve.isPointer) {
     emitNode(node.right);
     bytes.emitU8(WASM_OPCODE_SET_LOCAL);
     bytes.writeVarUnsigned(resolve.index);
   }
-  // just a default variable assignment
+  // assign to default variable
   else {
     if (insideVariableDeclaration) {
       emitNode(node.right);
@@ -416,41 +455,31 @@ function emitAssignment(node) {
 
 function emitIdentifier(node) {
   let resolve = scope.resolve(node.value);
-  if (resolve.isReference && resolve.isParameter) {
-    bytes.emitU8(WASM_OPCODE_GET_LOCAL);
-    bytes.writeVarUnsigned(resolve.index);
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
-  }
   // global variable
-  else if (resolve.isGlobal) {
+  if (resolve.isGlobal) {
     bytes.emitU8(WASM_OPCODE_GET_GLOBAL);
     bytes.writeVarUnsigned(resolve.index);
   }
-  // handle pointer parameter
+  // we only have access to the passed in value
   else if (resolve.isParameter) {
     bytes.emitU8(WASM_OPCODE_GET_LOCAL);
     bytes.writeVarUnsigned(resolve.index);
   }
-  // reference variable
-  else if (resolve.isReference && !resolve.isParameter) {
+  // pointer variable
+  else if (resolve.isPointer) {
+    // push the pointer's pointed to address
     bytes.emitUi32(resolve.offset);
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // i32
     bytes.writeVarUnsigned(0);
   }
-  // pointer variable
-  // push the pointers pointed to adress
-  else if (resolve.isPointer) {
-    // push the pointer's address
-    bytes.emitUi32(resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
+  // just a shortcut to the assigned value
+  else if (resolve.isAlias) {
+    emitNode(resolve.aliasValue);
   }
   // default variable
   else {
+    // variables are stored in memory too
     bytes.emitUi32(resolve.offset);
     bytes.emitU8(WASM_OPCODE_I32_LOAD);
     bytes.emitU8(2); // i32
@@ -461,12 +490,10 @@ function emitIdentifier(node) {
 let insideVariableDeclaration = false;
 function emitVariableDeclaration(node) {
   let resolve = scope.resolve(node.id);
-  let storeInMemory = resolve.isMemoryLocated;
   node.offset = currentHeapOffset;
   // store pointer
-  // +0 = pointer address, +4 = address pointed to
-  if (resolve.isPointer || resolve.isReference) {
-    __imports.log("Store pointer variable", node.id, "in memory at", resolve.offset);
+  if (resolve.isPointer) {
+    __imports.log("Store variable", node.id, "in memory at", resolve.offset);
     // # store the pointed adress
     // offset
     bytes.emitUi32(resolve.offset);
@@ -475,6 +502,19 @@ function emitVariableDeclaration(node) {
     insideVariableDeclaration = true;
     emitNode(node.init);
     insideVariableDeclaration = false;
+    // store
+    bytes.emitU8(WASM_OPCODE_I32_STORE);
+    bytes.emitU8(2); // i32
+    bytes.emitU8(0);
+  }
+  // store alias
+  else if (resolve.isAlias) {
+    __imports.log("Store alias", node.id, "in memory at", resolve.offset);
+    // offset
+    bytes.emitUi32(resolve.offset);
+    growHeap(4);
+    // alias = &(init)
+    emitNode(node.aliasReference);
     // store
     bytes.emitU8(WASM_OPCODE_I32_STORE);
     bytes.emitU8(2); // i32

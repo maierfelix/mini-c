@@ -5,11 +5,11 @@ i32 swap(i32 *c, i32 *d) {
   return (0);
 };
 
-// swaps adress of a, b
-i32 main() {
-  i32 a = 42;
-  i32 b = 66;
-  i32 *ptr = &a;
-  swap(ptr, &b);
+export i32 main() {
+  i32 a = 10;
+  i32 b = 20;
+  i32 &rb = b;
+  rb = 33;
+  swap(&a, &rb);
   return (a);
 };

@@ -174,14 +174,14 @@ function parseDeclaration(extern) {
   next();
   let isPointer = eat(Operators.MUL);
   // if not pointer, check if &-reference
-  let isReference = false;
-  if (!isPointer) { isReference = eat(Operators.BIN_AND); }
+  let isAlias = false;
+  if (!isPointer) { isAlias = eat(Operators.BIN_AND); }
   expectIdentifier();
   const name = current.value;
   next();
   const token = current.kind;
   if (token === Operators.ASS) {
-    node = parseVariableDeclaration(type, name, extern, isPointer, isReference);
+    node = parseVariableDeclaration(type, name, extern, isPointer, isAlias);
   }
   else if (TokenList.LPAREN) {
     node = parseFunctionDeclaration(type, name, extern);
@@ -329,7 +329,7 @@ function parseFunctionParameters() {
   return (params);
 };
 
-function parseVariableDeclaration(type, name, extern, isPointer, isReference) {
+function parseVariableDeclaration(type, name, extern, isPointer, isAlias) {
   let node = {
     kind: Nodes.VariableDeclaration,
     type: type,
@@ -337,10 +337,8 @@ function parseVariableDeclaration(type, name, extern, isPointer, isReference) {
     init: null,
     isGlobal: false,
     isPointer,
-    isReference
+    isAlias
   };
-  // force pointers to be stored inside memory
-  if (isPointer) node.isMemoryLocated = true;
   // only allow export of global variables
   if (extern) expectScope(node, null);
   //expectScope(node, Nodes.FunctionDeclaration);
@@ -350,14 +348,6 @@ function parseVariableDeclaration(type, name, extern, isPointer, isReference) {
   }
   expect(Operators.ASS);
   let init = parseExpression(Operators.LOWEST);
-  // => reference wrapper
-  if (isReference) {
-    init = {
-      kind: Nodes.UnaryPrefixExpression,
-      operator: "&",
-      value: init
-    };
-  }
   node.init = {
     kind: Nodes.BinaryExpression,
     left: {
@@ -368,6 +358,14 @@ function parseVariableDeclaration(type, name, extern, isPointer, isReference) {
     right: init,
     operator: "="
   };
+  if (isAlias) {
+    node.aliasValue = init;
+    node.aliasReference = {
+      kind: Nodes.UnaryPrefixExpression,
+      operator: "&",
+      value: node.aliasValue
+    };
+  }
   if (!node.isGlobal) {
     let fn = lookupFunctionScope(scope).node;
     fn.locals.push(node);

@@ -114,7 +114,7 @@ let Operators = {};
   Label[Label["|"] = ++ii] = "BIN_OR";
   Label[Label["!"] = ++ii] = "NOT";
   Label[Label["--"] = ++ii] = "DECR";
-  Label[Label["++"] = ii] = "INCR";
+  Label[Label["++"] = ++ii] = "INCR";
   Label.UNARY_PREFIX = ++ii;
   Label.HIGHEST = ++ii;
 })(Operators);
