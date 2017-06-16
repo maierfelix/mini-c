@@ -64,7 +64,7 @@ let Operators = {};
   Label[Label["false"] = ++ii] = "FALSE";
   /** Declaration keywords */
   Label[Label["import"] = ++ii] = "IMPORT";
-  Label[Label["export"] = ++ii] = "EXPORT";
+  Label[Label["extern"] = ++ii] = "EXPORT";
   /** Statement keywords */
   Label[Label["break"] = ++ii] = "BREAK";
   Label[Label["continue"] = ++ii] = "CONTINUE";

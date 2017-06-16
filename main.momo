@@ -1,14 +1,14 @@
-i32 swap(i32 *c, i32 *d) {
-  i32 tmp = *c;
+int swap(int *c, int *d) {
+  int tmp = *c;
   *c = *d;
   *d = tmp;
   return (0);
 };
 
-export i32 main() {
-  i32 a = 10;
-  i32 b = 20;
-  i32 &rb = b;
+extern int main() {
+  int a = 10;
+  int b = 20;
+  int &rb = b;
   rb = 33;
   swap(&a, &rb);
   return (a);

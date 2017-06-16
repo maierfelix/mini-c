@@ -1,6 +1,6 @@
 module.exports = [
-  `export i32 main() {
-    i32 a = 5;
+  ` int main() {
+    int a = 5;
     if (a == 5) {
       a = 25;
     } else {
@@ -9,8 +9,8 @@ module.exports = [
     return (a);
   };`,
   `25`,
-  `export i32 main() {
-    i32 a = 42;
+  ` int main() {
+    int a = 42;
     if (a == 5) {
       a = 25;
     } else {
@@ -19,9 +19,9 @@ module.exports = [
     return (a);
   };`,
   `84`,
-  `export i32 main() {
-    i32 a = 0;
-    i32 b = 0;
+  ` int main() {
+    int a = 0;
+    int b = 0;
     while (a < 100) {
       if (a == 5) {
         b = 25;

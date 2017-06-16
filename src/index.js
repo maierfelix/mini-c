@@ -39,34 +39,46 @@ function loadStdlib() {
   });
 };
 
-function compile(str, imports) {
+function compile(str, imports, sync) {
   // reset
   findex = pindex = 0;
   scope = global = current = __imports = tokens = null;
   bytes = new ByteArray();
   __imports = imports;
   currentHeapOffset = 0;
+
+  // process
+  let tkns = scan(str);
+  let ast = parse(tkns);
+  emit(ast);
+  let buffer = new Uint8Array(bytes);
+  let dump = hexDump(buffer);
+
+  // output
+  if (sync === true) {
+    let module = new WebAssembly.Module(buffer);
+    let instance = new WebAssembly.Instance(module);
+    return ({
+      ast: ast,
+      dump: dump,
+      buffer: buffer,
+      memory: instance.exports.memory,
+      instance: instance,
+      exports: instance.exports
+    });
+  }
   return new Promise((resolve, reject) => {
-    /*loadStdlib().then((code) => {
-      str = code + str;*/
-      let tkns = scan(str);
-      let ast = parse(tkns);
-      emit(ast);
-      let buffer = new Uint8Array(bytes);
-      let dump = hexDump(buffer);
-      WebAssembly.instantiate(buffer).then((result) => {
-        let instance = result.instance;
-        let output = {
-          ast: ast,
-          dump: dump,
-          buffer: buffer,
-          memory: instance.exports.memory,
-          instance: instance,
-          exports: instance.exports
-        };
-        resolve(output);
+    WebAssembly.instantiate(buffer).then((result) => {
+      let instance = result.instance;
+      resolve({
+        ast: ast,
+        dump: dump,
+        buffer: buffer,
+        memory: instance.exports.memory,
+        instance: instance,
+        exports: instance.exports
       });
-    /*});*/
+    });
   });
 };
 

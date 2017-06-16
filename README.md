@@ -1,19 +1,19 @@
 # <img width="10%" src="http://i.imgur.com/mquA9Ww.png" /> mini-wasm 
-[Just let me play with it](http://maierfelix.github.io/mini-wasm/)
+[Just let me play with it](http://maierfelix.github.io/momo/)
 
 ### Description:
-This is a small compiler, offering a basic C-like language which compiles into WebAssembly.
+This is an experimental C compiler which compiles into WebAssembly. It's currently written in plain JavaScript but will be rewritten in C (and get self-hosted) as soon as the compiler has enough features to do so.
 
 ### Syntax:
 
-````c++
-i32 fact(i32 n) {
+````c
+int fact(i32 n) {
   if (n == 0) {
     return 1;
   }
   return (n * fact(n - 1));
 };
-export i32 main(i32 a, i32 b) {
+extern int main(int a, int b) {
   return (fact(a + b));
 };
 ````
@@ -25,7 +25,17 @@ export i32 main(i32 a, i32 b) {
 
 ### API:
 
-
-
+#### Compiling a source file:
+````js
+compile(src: String, imports: Object, sync: Boolean)
+````
+````js
+compile(`
+  int main(int a, int b) {
+    return (a + b);
+  };
+`, {}, false);
+````
+ 
 ### Contribution:
  - Feel free to send any kind of pull request

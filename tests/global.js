@@ -1,13 +1,13 @@
 module.exports = [
   `
-  i32 test = 4;
-  export i32 main(i32 a, i32 b) {
+  int test = 4;
+   int main(int a, int b) {
     return (test);
   };`,
   `4`,
   `
-  i32 test = 4;
-  export i32 main(i32 a, i32 b) {
+  int test = 4;
+   int main(int a, int b) {
     test = 8;
     return (test);
   };
