@@ -42,9 +42,14 @@ function getWasmOperator(op) {
 };
 
 /**
- * 1. Type section -> function signatures
- * 2. Func section -> function indices
- * 3. Code section -> function bodys
+ * 1. Type section    -> function signatures
+ * 2. Func section    -> function signature indices
+ * 4. Table section   -> function indirect call indices
+ * 5. Memory section  -> memory sizing
+ * 6. Global section  -> global variables
+ * 7. Export section  -> function exports
+ * 8. Element section -> table section elements
+ * 8. Code section    -> function bodys
  */
 function emit(node) {
   scope = node.context;
@@ -52,10 +57,60 @@ function emit(node) {
   bytes.emitU32(WASM_VERSION);
   emitTypeSection(node.body);
   emitFunctionSection(node.body);
+  emitTableSection(node.body);
   emitMemorySection(node);
   emitGlobalSection(node.body);
   emitExportSection(node.body);
+  emitElementSection(node.body);
   emitCodeSection(node.body);
+};
+
+function emitElementSection(node) {
+  bytes.emitU8(WASM_SECTION_ELEMENT);
+  let size = bytes.createU32vPatch();
+  let count = bytes.createU32vPatch();
+  let amount = 0;
+  node.body.map((child) => {
+    if (child.kind === Nodes.FunctionDeclaration) {
+      // link to anyfunc table
+      bytes.writeVarUnsigned(0);
+      bytes.emitUi32(child.index);
+      bytes.emitU8(WASM_OPCODE_END);
+      bytes.writeVarUnsigned(1);
+      bytes.writeVarUnsigned(child.index);
+      amount++;
+    }
+  });
+  count.patch(amount);
+  size.patch(bytes.length - size.offset);
+};
+
+function emitTableSection(node) {
+  bytes.emitU8(WASM_SECTION_TABLE);
+  let size = bytes.createU32vPatch();
+  let count = bytes.createU32vPatch();
+  let amount = 1;
+  // mvp only allows <= 1
+  emitFunctionTable(node);
+  count.patch(amount);
+  size.patch(bytes.length - size.offset);
+};
+
+function emitFunctionTable(node) {
+  // type
+  bytes.emitU8(WASM_TYPE_CTOR_ANYFUNC);
+  // flags
+  bytes.emitU8(1);
+  let count = 0;
+  node.body.map((child) => {
+    if (child.kind === Nodes.FunctionDeclaration) {
+      count++;
+    }
+  });
+  // initial
+  bytes.writeVarUnsigned(count);
+  // max
+  bytes.writeVarUnsigned(count);
 };
 
 function emitGlobalSection(node) {
@@ -66,7 +121,7 @@ function emitGlobalSection(node) {
   node.body.map((child) => {
     if (child.kind === Nodes.VariableDeclaration && child.isGlobal) {
       let init = child.init.right;
-      // global have their own indices, patch it here
+      // globals have their own indices, patch it here
       child.index = amount++;
       bytes.emitU8(getWasmType(child.type));
       // mutability, enabled by default
@@ -95,7 +150,7 @@ function emitTypeSection(node) {
       });
       // emit type
       if (child.type !== TokenList.VOID) {
-        // return count
+        // return count, max 1 in MVP
         bytes.emitU8(1);
         // return type
         bytes.emitU8(getWasmType(child.type));
@@ -235,8 +290,16 @@ function emitNode(node) {
     node.parameter.map((child) => {
       emitNode(child);
     });
-    bytes.emitU8(WASM_OPCODE_CALL);
-    bytes.writeVarUnsigned(resolve.index);
+    if (resolve.isPointer) {
+      bytes.emitUi32(resolve.offset);
+      bytes.emitLoad32();
+      bytes.emitU8(WASM_OPCODE_CALL_INDIRECT);
+      bytes.writeVarUnsigned(resolve.offset);
+      bytes.emitU8(0);
+    } else {
+      bytes.emitU8(WASM_OPCODE_CALL);
+      bytes.writeVarUnsigned(resolve.index);
+    }
   }
   else if (kind === Nodes.VariableDeclaration) {
     emitVariableDeclaration(node);
@@ -317,9 +380,7 @@ function emitNode(node) {
       bytes.emitU8(0);
       bytes.emitUi32(resolve.offset);
       // tee_local with load
-      bytes.emitU8(WASM_OPCODE_I32_LOAD);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
+      bytes.emitLoad32();
     }
     else if (operator === "&") {
       emitReference(node);
@@ -373,6 +434,10 @@ function emitReference(node) {
       __imports.log("Unsupported adress-of value", getLabelName(value.kind));
     }
   }
+  // &func == func
+  else if (resolve.kind === Nodes.FunctionDeclaration) {
+    bytes.emitUi32(resolve.index);
+  }
   // emit the reference's &(init)
   else if (resolve.isAlias) {
     emitNode(resolve.aliasReference);
@@ -386,9 +451,7 @@ function emitReference(node) {
 // *var *(*expr)
 function emitDereference(node) {
   emitNode(node.value);
-  bytes.emitU8(WASM_OPCODE_I32_LOAD);
-  bytes.emitU8(2); // i32
-  bytes.writeVarUnsigned(0);
+  bytes.emitLoad32();
 };
 
 // *ptr = node
@@ -469,21 +532,24 @@ function emitIdentifier(node) {
   else if (resolve.isPointer) {
     // push the pointer's pointed to address
     bytes.emitUi32(resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
+    bytes.emitLoad32();
   }
   // just a shortcut to the assigned value
   else if (resolve.isAlias) {
     emitNode(resolve.aliasValue);
   }
+  // return the function's address
+  else if (resolve.kind === Nodes.FunctionDeclaration) {
+    bytes.emitUi32(resolve.index);
+  }
   // default variable
-  else {
+  else if (resolve.kind === Nodes.VariableDeclaration) {
     // variables are stored in memory too
     bytes.emitUi32(resolve.offset);
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
+    bytes.emitLoad32();
+  }
+  else {
+    __imports.error("Unknown identifier kind", getLabelName(resolve.kind));
   }
 };
 
@@ -564,9 +630,7 @@ function emitPostfixExpression(node) {
     bytes.emitU8(0);
     bytes.emitUi32(resolve.offset);
     // tee_local with load
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
+    bytes.emitLoad32();
     bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_SUB);
   } else if (node.operator === "--") {
@@ -581,9 +645,7 @@ function emitPostfixExpression(node) {
     bytes.emitU8(0);
     bytes.emitUi32(resolve.offset);
     // tee_local with load
-    bytes.emitU8(WASM_OPCODE_I32_LOAD);
-    bytes.emitU8(2); // i32
-    bytes.writeVarUnsigned(0);
+    bytes.emitLoad32();
     bytes.emitUi32(1);
     bytes.emitU8(WASM_OPCODE_I32_ADD);
   }

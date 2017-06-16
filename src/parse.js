@@ -388,8 +388,9 @@ function parseCallParameters(id) {
   expect(TokenList.LPAREN);
   let index = 0;
   while (true) {
-    let isReference = callee.parameter[index].isReference;
     if (peek(TokenList.RPAREN)) break;
+    //let isReference = callee.parameter[index].isReference;
+    let isReference = false;
     let expr = parseExpression(Operators.LOWEST);
     // called functions parameter expects reference
     if (isReference && expr.kind === Nodes.Literal) {
