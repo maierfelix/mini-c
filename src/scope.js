@@ -22,6 +22,10 @@ function Scope() {
     return (null);
   };
   this.register = function(id, node) {
+    if (node.kind === Nodes.FunctionDeclaration) {
+      this.registerFunction(id, node);
+      return;
+    }
     if (this.symbols[id] !== void 0) {
       __imports.error("Symbol " + id + " is already defined");
     }
@@ -33,6 +37,21 @@ function Scope() {
         node.index = scope.localIndex++;
       }
     }
+  };
+  this.registerFunction = function(id, node) {
+    // allow function to get overwritten (e.g function prototypes)
+    let resolve = this.symbols[id] || null;
+    // function already defined, overwrite if prototype
+    if (resolve) {
+      if (resolve.type !== node.type) {
+        __imports.error(`Conflicting types for '${id}'`);
+      }
+      // TODO: validate parameter types
+      if (!resolve.isPrototype && !node.isPrototype) {
+        __imports.error(`Redefinition of '${id}'`);
+      }
+    }
+    this.symbols[id] = node;
   };
 };
 

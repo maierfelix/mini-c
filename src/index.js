@@ -7,7 +7,6 @@ let global = null;
 let pindex = 0;
 let tokens = null;
 let current = null;
-let findex = 0;
 let __imports = null;
 
 function hexDump(array) {
@@ -41,7 +40,7 @@ function loadStdlib() {
 
 function compile(str, imports, sync) {
   // reset
-  findex = pindex = 0;
+  pindex = 0;
   scope = global = current = __imports = tokens = null;
   bytes = new ByteArray();
   __imports = imports;

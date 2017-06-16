@@ -8,5 +8,16 @@ module.exports = [
    int main(int a, int b) {
     return (fact(4));
   };`,
-  `24`
+  `24`,
+  `int glob = 0;
+  void test(int a) {
+    if (a == 1) { glob = 42; }
+  };
+
+  extern int main() {
+    test(1);
+    return (glob);
+  };
+  `,
+  `42`
 ];

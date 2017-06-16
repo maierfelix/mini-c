@@ -273,7 +273,7 @@ function parseReturnStatement() {
 
 function parseFunctionDeclaration(type, name, extern) {
   let node = {
-    index: findex++,
+    index: 0,
     isExported: !!extern,
     kind: Nodes.FunctionDeclaration,
     type: type,
@@ -281,12 +281,14 @@ function parseFunctionDeclaration(type, name, extern) {
     locals: [],
     returns: [],
     parameter: null,
+    prototype: null,
     body: null
   };
   expectScope(node, null); // only allow global functions
+  node.parameter = parseFunctionParameters(node);
+  node.isPrototype = !eat(TokenList.LBRACE);
   scope.register(name, node);
-  node.parameter = parseFunctionParameters();
-  if (eat(TokenList.LBRACE)) {
+  if (!node.isPrototype) {
     pushScope(node);
     node.parameter.map((param) => {
       scope.register(param.value, param);
@@ -295,38 +297,49 @@ function parseFunctionDeclaration(type, name, extern) {
     popScope();
     expect(TokenList.RBRACE);
   }
-  if (node.type !== TokenList.VOID && !node.returns.length) {
+  if (node.prototype !== null && node.type !== TokenList.VOID && !node.returns.length) {
     __imports.error("Missing return in function: " + node.id);
   }
   return (node);
 };
 
-function parseFunctionParameters() {
+function parseFunctionParameters(node) {
   let params = [];
+  let hasPrototype = node.prototype !== null;
   expect(TokenList.LPAREN);
   while (true) {
     if (peek(TokenList.RPAREN)) break;
-    if (!isNativeType(current)) {
-      __imports.error("Missing parameter kind: " + current);
-    }
-    const type = current.kind;
-    next();
-    let isPointer = eat(Operators.MUL);
-    let isReference = false;
-    if (!isPointer) { isReference = eat(Operators.BIN_AND); }
-    expectIdentifier();
-    params.push(current);
-    let param = params[params.length - 1];
-    param.type = type;
-    param.kind = Nodes.Parameter;
-    param.isParameter = true;
-    param.isPointer = isPointer;
-    param.isReference = isReference;
-    next();
+    let param = parseFunctionParameter(node);
+    params.push(param);
     if (!eat(TokenList.COMMA)) break;
   };
   expect(TokenList.RPAREN);
   return (params);
+};
+
+function parseFunctionParameter(node) {
+  let type = null;
+  // type
+  if (isNativeType(current)) {
+    type = current.kind;
+    next();
+  } else {
+    __imports.error("Missing type for parameter in", node.id);
+  }
+  // *&
+  let isPointer = eat(Operators.MUL);
+  let isReference = false;
+  if (!isPointer) { isReference = eat(Operators.BIN_AND); }
+  // id
+  expectIdentifier();
+  let param = current;
+  param.type = type;
+  param.kind = Nodes.Parameter;
+  param.isParameter = true;
+  param.isPointer = isPointer;
+  param.isReference = isReference;
+  next();
+  return (param);
 };
 
 function parseVariableDeclaration(type, name, extern, isPointer, isAlias) {
@@ -389,18 +402,18 @@ function parseCallParameters(id) {
   let index = 0;
   while (true) {
     if (peek(TokenList.RPAREN)) break;
-    //let isReference = callee.parameter[index].isReference;
-    let isReference = false;
     let expr = parseExpression(Operators.LOWEST);
+    //let isReference = callee.parameter[index].isReference;
+    //let isReference = false;
     // called functions parameter expects reference
-    if (isReference && expr.kind === Nodes.Literal) {
+    /*if (isReference && expr.kind === Nodes.Literal) {
       // wrap pass-by-reference node around passed in expression
       expr = {
         kind: Nodes.UnaryPrefixExpression,
         operator: "&",
         value: expr
       };
-    }
+    }*/
     params.push(expr);
     if (!eat(TokenList.COMMA)) break;
     index++;

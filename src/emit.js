@@ -71,7 +71,7 @@ function emitElementSection(node) {
   let count = bytes.createU32vPatch();
   let amount = 0;
   node.body.map((child) => {
-    if (child.kind === Nodes.FunctionDeclaration) {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
       // link to anyfunc table
       bytes.writeVarUnsigned(0);
       bytes.emitUi32(child.index);
@@ -103,7 +103,7 @@ function emitFunctionTable(node) {
   bytes.emitU8(1);
   let count = 0;
   node.body.map((child) => {
-    if (child.kind === Nodes.FunctionDeclaration) {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
       count++;
     }
   });
@@ -140,7 +140,7 @@ function emitTypeSection(node) {
   let count = bytes.createU32vPatch();
   let amount = 0;
   node.body.map((child) => {
-    if (child.kind === Nodes.FunctionDeclaration) {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
       bytes.emitU8(WASM_TYPE_CTOR_FUNC);
       // parameter count
       bytes.writeVarUnsigned(child.parameter.length);
@@ -158,6 +158,7 @@ function emitTypeSection(node) {
       } else {
         bytes.emitU8(0);
       }
+      child.index = amount;
       amount++;
     }
   });
@@ -172,7 +173,7 @@ function emitFunctionSection(node) {
   let count = bytes.createU32vPatch();
   let amount = 0;
   node.body.map((child) => {
-    if (child.kind === Nodes.FunctionDeclaration) {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
       amount++;
       bytes.writeVarUnsigned(child.index);
     }
@@ -196,8 +197,9 @@ function emitExportSection(node) {
   let size = bytes.createU32vPatch();
   let count = bytes.createU32vPatch();
   let amount = 0;
+  // export functions
   node.body.map((child) => {
-    if (child.kind === Nodes.FunctionDeclaration) {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
       if (child.isExported || child.id === "main") {
         amount++;
         bytes.emitString(child.id);
@@ -223,7 +225,7 @@ function emitCodeSection(node) {
   let count = bytes.createU32vPatch();
   let amount = 0;
   node.body.map((child) => {
-    if (child.kind === Nodes.FunctionDeclaration) {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
       emitFunction(child);
       amount++;
     }
