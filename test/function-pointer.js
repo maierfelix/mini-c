@@ -27,5 +27,13 @@ module.exports = [
     int *func1 = add;
     return (func1(6, 16) == add(6, 16));
   };`,
-  `1`
+  `1`,
+  `int add() {
+    return (42);
+  };
+  int main() {
+    int *func1 = add;
+    return (func1());
+  };`,
+  `42`
 ];

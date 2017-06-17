@@ -78,5 +78,51 @@ module.exports = [
     int k = i++;
     return (k);
   };`,
-  `1`
+  `1`,
+  `void test(int *h) {
+    *h = 124;
+    *h += 1;
+    ++(*h);
+  };
+  int main() {
+    int g = 123;
+    test(&g);
+    return (g == 126);
+  };`,
+  `1`,
+  `void test(int *h) {
+    *h = 124;
+    *h += 1;
+    (*h)++;
+  };
+  int main() {
+    int g = 123;
+    test(&g);
+    return (g == 126);
+  };`,
+  `1`,
+  `int test(int h) {
+    h += 1;
+    h++;
+    ++h;
+    return (h++);
+  };
+  int main() {
+    int g = 123;
+    return (test(g));
+  };
+  `,
+  `126`,
+  `int test(int h) {
+    h += 1;
+    h++;
+    ++h;
+    return (++h);
+  };
+  int main() {
+    int g = 123;
+    return (test(g));
+  };
+  `,
+  `127`
 ];

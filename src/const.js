@@ -96,7 +96,13 @@ let Operators = {};
   Label[Label["*="] = ++ii] = "MUL_ASS";
   Label[Label["/="] = ++ii] = "DIV_ASS";
   Label[Label["%="] = ++ii] = "MOD_ASS";
-  Label[Label["=>"] = ++ii] = "CAST";
+
+  Label[Label["&="] = ++ii] = "BIN_AND_ASS";
+  Label[Label["|="] = ++ii] = "BIN_OR_ASS";
+  Label[Label["^="] = ++ii] = "BIN_XOR_ASS";
+  Label[Label["<<="] = ++ii] = "BIN_SHL_ASS";
+  Label[Label[">>="] = ++ii] = "BIN_SHR_ASS";
+
   Label[Label["||"] = ++ii] = "OR";
   Label[Label["&&"] = ++ii] = "AND";
   Label[Label["=="] = ++ii] = "EQ";
@@ -110,8 +116,14 @@ let Operators = {};
   Label[Label["*"] = ++ii] = "MUL";
   Label[Label["/"] = ++ii] = "DIV";
   Label[Label["%"] = ++ii] = "MOD";
+
   Label[Label["&"] = ++ii] = "BIN_AND";
   Label[Label["|"] = ++ii] = "BIN_OR";
+  Label[Label["~"] = ++ii] = "BIN_NOT";
+  Label[Label["^"] = ++ii] = "BIN_XOR";
+  Label[Label["<<"] = ++ii] = "BIN_SHL";
+  Label[Label[">>"] = ++ii] = "BIN_SHR";
+
   Label[Label["!"] = ++ii] = "NOT";
   Label[Label["--"] = ++ii] = "DECR";
   Label[Label["++"] = ++ii] = "INCR";

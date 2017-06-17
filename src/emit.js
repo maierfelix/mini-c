@@ -29,6 +29,9 @@ function getWasmOperator(op) {
     case "*": return (WASM_OPCODE_I32_MUL);
     case "/": return (WASM_OPCODE_I32_DIV_S);
     case "%": return (WASM_OPCODE_I32_REM_S);
+    case "^": return (WASM_OPCODE_I32_XOR);
+    case "|": return (WASM_OPCODE_I32_OR);
+    case "&": return (WASM_OPCODE_I32_AND);
     case "<": return (WASM_OPCODE_I32_LT_S);
     case "<=": return (WASM_OPCODE_I32_LE_S);
     case ">": return (WASM_OPCODE_I32_GT_S);
@@ -37,6 +40,8 @@ function getWasmOperator(op) {
     case "!=": return (WASM_OPCODE_I32_NEQ);
     case "&&": return (WASM_OPCODE_I32_AND);
     case "||": return (WASM_OPCODE_I32_OR);
+    case "<<": return (WASM_OPCODE_I32_SHL);
+    case ">>": return (WASM_OPCODE_I32_SHR_S);
   };
   return (-1);
 };
@@ -296,7 +301,7 @@ function emitNode(node) {
       bytes.emitUi32(resolve.offset);
       bytes.emitLoad32();
       bytes.emitU8(WASM_OPCODE_CALL_INDIRECT);
-      bytes.writeVarUnsigned(resolve.offset);
+      bytes.writeVarUnsigned(0); // anyfunc table
       bytes.emitU8(0);
     } else {
       bytes.emitU8(WASM_OPCODE_CALL);
@@ -350,46 +355,7 @@ function emitNode(node) {
     }
   }
   else if (kind === Nodes.UnaryPrefixExpression) {
-    let operator = node.operator;
-    // 0 - x
-    if (operator === "-") {
-      bytes.emitUi32(0);
-      emitNode(node.value);
-      bytes.emitU8(WASM_OPCODE_I32_SUB);
-    }
-    // ignored
-    else if (operator === "+") {
-      emitNode(node.value);
-    }
-    // x = 0
-    else if (operator === "!") {
-      emitNode(node.value);
-      bytes.emitU8(WASM_OPCODE_I32_EQZ);
-    }
-    else if (operator === "++" || operator === "--") {
-      let local = node.value;
-      let resolve = scope.resolve(local.value);
-      let op = (
-        node.operator === "++" ? WASM_OPCODE_I32_ADD : WASM_OPCODE_I32_SUB
-      );
-      bytes.emitUi32(resolve.offset);
-      emitNode(local);
-      bytes.emitUi32(1);
-      bytes.emitU8(op);
-      // store it
-      bytes.emitU8(WASM_OPCODE_I32_STORE);
-      bytes.emitU8(2); // i32
-      bytes.emitU8(0);
-      bytes.emitUi32(resolve.offset);
-      // tee_local with load
-      bytes.emitLoad32();
-    }
-    else if (operator === "&") {
-      emitReference(node);
-    }
-    else if (operator === "*") {
-      emitDereference(node);
-    }
+    emitPrefixExpression(node);
   }
   else if (kind === Nodes.UnaryPostfixExpression) {
     emitPostfixExpression(node);
@@ -398,7 +364,21 @@ function emitNode(node) {
     let operator = node.operator;
     if (operator === "=") {
       emitAssignment(node);
-    } else {
+    }
+    // &&, || => l >= 1, r >= 1
+    else if (operator === "&&" || operator === "||") {
+      // left
+      emitNode(node.left);
+      bytes.emitUi32(1);
+      bytes.emitU8(WASM_OPCODE_I32_GE_S);
+      // right
+      emitNode(node.right);
+      bytes.emitUi32(1);
+      bytes.emitU8(WASM_OPCODE_I32_GE_S);
+      // op
+      bytes.emitU8(getWasmOperator(operator));
+    }
+    else {
       emitNode(node.left);
       emitNode(node.right);
       bytes.emitU8(getWasmOperator(operator));
@@ -459,12 +439,10 @@ function emitDereference(node) {
 // *ptr = node
 function emitPointerAssignment(node) {
   emitNode(node.left.value);
-  // push the adress to assign
+  // push the address to assign
   emitNode(node.right);
   // store it
-  bytes.emitU8(WASM_OPCODE_I32_STORE);
-  bytes.emitU8(2); // i32
-  bytes.emitU8(0);
+  bytes.emitStore32();
 };
 
 function emitAssignment(node) {
@@ -499,11 +477,11 @@ function emitAssignment(node) {
     });
   }
   // assign to default parameter
-  else if (resolve.isParameter && !resolve.isPointer) {
+  /*else if (resolve.isParameter && !resolve.isPointer) {
     emitNode(node.right);
     bytes.emitU8(WASM_OPCODE_SET_LOCAL);
     bytes.writeVarUnsigned(resolve.index);
-  }
+  }*/
   // assign to default variable
   else {
     if (insideVariableDeclaration) {
@@ -511,9 +489,7 @@ function emitAssignment(node) {
     } else {
       bytes.emitUi32(resolve.offset);
       emitNode(node.right);
-      bytes.emitU8(WASM_OPCODE_I32_STORE);
-      bytes.emitU8(2); // i32
-      bytes.writeVarUnsigned(0);
+      bytes.emitStore32();
     }
   }
 };
@@ -526,10 +502,10 @@ function emitIdentifier(node) {
     bytes.writeVarUnsigned(resolve.index);
   }
   // we only have access to the passed in value
-  else if (resolve.isParameter) {
+  /*else if (resolve.isParameter) {
     bytes.emitU8(WASM_OPCODE_GET_LOCAL);
     bytes.writeVarUnsigned(resolve.index);
-  }
+  }*/
   // pointer variable
   else if (resolve.isPointer) {
     // push the pointer's pointed to address
@@ -539,6 +515,11 @@ function emitIdentifier(node) {
   // just a shortcut to the assigned value
   else if (resolve.isAlias) {
     emitNode(resolve.aliasValue);
+  }
+  // parameters are stored in memory too
+  else if (resolve.kind === Nodes.Parameter) {
+    bytes.emitUi32(resolve.offset);
+    bytes.emitLoad32();
   }
   // return the function's address
   else if (resolve.kind === Nodes.FunctionDeclaration) {
@@ -562,7 +543,7 @@ function emitVariableDeclaration(node) {
   // store pointer
   if (resolve.isPointer) {
     __imports.log("Store variable", node.id, "in memory at", resolve.offset);
-    // # store the pointed adress
+    // # store the pointed address
     // offset
     bytes.emitUi32(resolve.offset);
     growHeap(4);
@@ -571,9 +552,7 @@ function emitVariableDeclaration(node) {
     emitNode(node.init);
     insideVariableDeclaration = false;
     // store
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
+    bytes.emitStore32();
   }
   // store alias
   else if (resolve.isAlias) {
@@ -584,9 +563,7 @@ function emitVariableDeclaration(node) {
     // alias = &(init)
     emitNode(node.aliasReference);
     // store
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
+    bytes.emitStore32();
   }
   // store variable
   else {
@@ -599,10 +576,21 @@ function emitVariableDeclaration(node) {
     emitNode(node.init);
     insideVariableDeclaration = false;
     // store
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
+    bytes.emitStore32();
   }
+};
+
+function emitParameterDeclaration(node) {
+  node.offset = currentHeapOffset;
+  __imports.log("Store parameter", node.value, "in memory at", node.offset);
+  // offset
+  bytes.emitUi32(node.offset);
+  growHeap(4);
+  // value
+  bytes.emitU8(WASM_OPCODE_GET_LOCAL);
+  bytes.writeVarUnsigned(node.index);
+  // store
+  bytes.emitStore32();
 };
 
 function getLoopDepthIndex() {
@@ -616,53 +604,118 @@ function getLoopDepthIndex() {
   return (label);
 };
 
+function emitPrefixExpression(node) {
+  let operator = node.operator;
+  // 0 - x
+  if (operator === "-") {
+    bytes.emitUi32(0);
+    emitNode(node.value);
+    bytes.emitU8(WASM_OPCODE_I32_SUB);
+  }
+  // ignored
+  else if (operator === "+") {
+    emitNode(node.value);
+  }
+  // x = 0
+  else if (operator === "!") {
+    emitNode(node.value);
+    bytes.emitU8(WASM_OPCODE_I32_EQZ);
+  }
+  // ~
+  else if (operator === "~") {
+    // invert
+    bytes.emitUi32(0);
+    emitNode(node.value);
+    bytes.emitU8(WASM_OPCODE_I32_SUB);
+    // sub 1
+    bytes.emitUi32(1);
+    bytes.emitU8(WASM_OPCODE_I32_SUB);
+  }
+  // reference
+  else if (operator === "&") {
+    emitReference(node);
+  }
+  // dereference
+  else if (operator === "*") {
+    emitDereference(node);
+  }
+  else if (operator === "++" || operator === "--") {
+    let op = (
+      node.operator === "++" ? WASM_OPCODE_I32_ADD : WASM_OPCODE_I32_SUB
+    );
+    // offset
+    if (node.value.operator === "*") {
+      emitNode(node.value.value);
+    } else {
+      let resolve = scope.resolve(node.value.value);
+      bytes.emitUi32(resolve.offset);
+    }
+    // value
+    emitNode(node.value);
+    // add/sub
+    bytes.emitUi32(1);
+    bytes.emitU8(op);
+    // store it
+    bytes.emitStore32();
+    if (node.value.operator === "*") {
+      emitNode(node.value.value);
+    } else {
+      let resolve = scope.resolve(node.value.value);
+      bytes.emitUi32(resolve.offset);
+      bytes.emitLoad32();
+    }
+  }
+};
+
 function emitPostfixExpression(node) {
   let local = node.value;
-  let resolve = scope.resolve(local.value);
-  if (node.operator === "++") {
-    // store offset
+  // store offset
+  if (local.operator === "*") {
+    emitNode(local.value);
+  } else {
+    let resolve = scope.resolve(local.value);
     bytes.emitUi32(resolve.offset);
-    // value to store
-    bytes.emitUi32(1);
-    emitIdentifier(local);
-    bytes.emitU8(WASM_OPCODE_I32_ADD);
-    // pop store
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
-    bytes.emitUi32(resolve.offset);
-    // tee_local with load
-    bytes.emitLoad32();
-    bytes.emitUi32(1);
-    bytes.emitU8(WASM_OPCODE_I32_SUB);
-  } else if (node.operator === "--") {
-    // store offset
-    bytes.emitUi32(resolve.offset);
-    emitIdentifier(local);
-    bytes.emitUi32(1);
-    bytes.emitU8(WASM_OPCODE_I32_SUB);
-    // pop store
-    bytes.emitU8(WASM_OPCODE_I32_STORE);
-    bytes.emitU8(2); // i32
-    bytes.emitU8(0);
-    bytes.emitUi32(resolve.offset);
-    // tee_local with load
-    bytes.emitLoad32();
-    bytes.emitUi32(1);
-    bytes.emitU8(WASM_OPCODE_I32_ADD);
   }
+  // store value
+  emitNode(local);
+  bytes.emitUi32(1);
+  if (node.operator === "++") bytes.emitU8(WASM_OPCODE_I32_ADD);
+  else bytes.emitU8(WASM_OPCODE_I32_SUB);
+  // pop store
+  bytes.emitStore32();
+  // push old value
+  if (local.operator === "*") {
+    emitNode(local.value);
+  } else {
+    let resolve = scope.resolve(local.value);
+    bytes.emitUi32(resolve.offset);
+    bytes.emitLoad32();
+  }
+  // tee the original value
+  bytes.emitUi32(1);
+  if (node.operator === "--") bytes.emitU8(WASM_OPCODE_I32_ADD);
+  else bytes.emitU8(WASM_OPCODE_I32_SUB);
 };
 
 function emitFunction(node) {
   let size = bytes.createU32vPatch();
-  // emit count of locals
   let locals = node.locals;
+  let params = node.parameter;
   // local count
-  bytes.writeVarUnsigned(locals.length);
+  bytes.writeVarUnsigned(locals.length + params.length);
   // local entry signatures
   locals.map((local) => {
     bytes.emitU8(1);
     bytes.emitU8(getWasmType(local.type));
+  });
+  // parameter count as locals too
+  params.map((param) => {
+    bytes.emitU8(1);
+    bytes.emitU8(getWasmType(param.type));
+  });
+  // register parameters
+  params.map((param) => {
+    emitParameterDeclaration(param);
   });
   emitNode(node.body);
   // patch function body size

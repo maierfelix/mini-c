@@ -13,7 +13,6 @@ module.exports = [
   void test(int a) {
     if (a == 1) { glob = 42; }
   };
-
   extern int main() {
     test(1);
     return (glob);

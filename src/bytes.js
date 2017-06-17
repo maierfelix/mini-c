@@ -160,6 +160,11 @@ class ByteArray extends Array {
     this.emitU8(2); // i32 alignment
     this.writeVarUnsigned(0);
   }
+  emitStore32() {
+    this.emitU8(WASM_OPCODE_I32_STORE);
+    this.emitU8(2); // i32 alignment
+    this.writeVarUnsigned(0);
+  }
   emitString(str) {
     var length = str.length | 0;
     this.emitU32v(length);
