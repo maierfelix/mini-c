@@ -234,7 +234,7 @@ module.exports = [
     return (*&ptr == &*ptr);
   };`,
   `1`,
-  // FIX pointer incr/decr
+  // FIX pointer address incr/decr
   `int main() {
     int a = 1;
     int b = 2;

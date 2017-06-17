@@ -163,6 +163,8 @@ function parseStatement() {
   let node = null;
   if (eat(TokenList.EXPORT)) {
     node = parseDeclaration(true);
+  } else if (peek(TokenList.ENUM)) {
+    node = parseEnumDeclaration();
   } else if (isNativeType(current)) {
     node = parseDeclaration(false);
   } else if (peek(TokenList.RETURN)) {
@@ -178,6 +180,46 @@ function parseStatement() {
     }
   }
   eat(TokenList.SEMICOLON);
+  return (node);
+};
+
+function parseEnumDeclaration() {
+  expect(TokenList.ENUM);
+  let node = {
+    kind: Nodes.EnumDeclaration,
+    name: null,
+    items: []
+  };
+  if (peek(Token.Identifier)) {
+    node.name = current.value;
+    next();
+  }
+  expect(TokenList.LBRACE);
+  let iter = 0;
+  while (true) {
+    expectIdentifier();
+    let emura = {
+      kind: Nodes.Enumerator,
+      name: current.value,
+      init: null
+    };
+    next();
+    if (eat(Operators.ASS)) {
+      let expr = parseExpression(Operators.LOWEST);
+      emura.init = expr;
+      emura.resolvedValue = evalExpression(expr);
+      iter = emura.resolvedValue;
+    } else {
+      emura.resolvedValue = iter;
+    }
+    node.items.push(emura);
+    scope.register(emura.name, emura);
+    // allow trailing commas
+    eat(TokenList.COMMA);
+    if (peek(TokenList.RBRACE)) break;
+    iter++;
+  };
+  expect(TokenList.RBRACE);
   return (node);
 };
 
@@ -421,6 +463,8 @@ function parseVariableDeclaration(type, name, extern, isPointer, isAlias) {
   if (!node.isGlobal) {
     let fn = lookupFunctionScope(scope).node;
     fn.locals.push(node);
+  } else {
+    node.resolvedValue = evalExpression(node.init.right);
   }
   return (node);
 };

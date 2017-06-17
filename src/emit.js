@@ -22,6 +22,16 @@ function getNativeTypeSize(type) {
   return (-1);
 };
 
+function getUIntSize(n) {
+  switch (n) {
+    case n < (Math.pow(2, 8)): return (0x8);
+    case n < (Math.pow(2, 16)): return (0x10);
+    case n < (Math.pow(2, 32)): return (0x20);
+    case n < (Math.pow(2, 64)): return (0x40);
+  };
+  throw new Error(`Undefined size for ${n}`);
+};
+
 function getWasmOperator(op) {
   switch (op) {
     case "+": return (WASM_OPCODE_I32_ADD);
@@ -68,75 +78,6 @@ function emit(node) {
   emitExportSection(node.body);
   emitElementSection(node.body);
   emitCodeSection(node.body);
-};
-
-function emitElementSection(node) {
-  bytes.emitU8(WASM_SECTION_ELEMENT);
-  let size = bytes.createU32vPatch();
-  let count = bytes.createU32vPatch();
-  let amount = 0;
-  node.body.map((child) => {
-    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
-      // link to anyfunc table
-      bytes.writeVarUnsigned(0);
-      bytes.emitUi32(child.index);
-      bytes.emitU8(WASM_OPCODE_END);
-      bytes.writeVarUnsigned(1);
-      bytes.writeVarUnsigned(child.index);
-      amount++;
-    }
-  });
-  count.patch(amount);
-  size.patch(bytes.length - size.offset);
-};
-
-function emitTableSection(node) {
-  bytes.emitU8(WASM_SECTION_TABLE);
-  let size = bytes.createU32vPatch();
-  let count = bytes.createU32vPatch();
-  let amount = 1;
-  // mvp only allows <= 1
-  emitFunctionTable(node);
-  count.patch(amount);
-  size.patch(bytes.length - size.offset);
-};
-
-function emitFunctionTable(node) {
-  // type
-  bytes.emitU8(WASM_TYPE_CTOR_ANYFUNC);
-  // flags
-  bytes.emitU8(1);
-  let count = 0;
-  node.body.map((child) => {
-    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
-      count++;
-    }
-  });
-  // initial
-  bytes.writeVarUnsigned(count);
-  // max
-  bytes.writeVarUnsigned(count);
-};
-
-function emitGlobalSection(node) {
-  bytes.emitU8(WASM_SECTION_GLOBAL);
-  let size = bytes.createU32vPatch();
-  let count = bytes.createU32vPatch();
-  let amount = 0;
-  node.body.map((child) => {
-    if (child.kind === Nodes.VariableDeclaration && child.isGlobal) {
-      let init = child.init.right;
-      // globals have their own indices, patch it here
-      child.index = amount++;
-      bytes.emitU8(getWasmType(child.type));
-      // mutability, enabled by default
-      bytes.emitU8(1);
-      emitNode(init);
-      bytes.emitU8(WASM_OPCODE_END);
-    }
-  });
-  count.patch(amount);
-  size.patch(bytes.length - size.offset);
 };
 
 function emitTypeSection(node) {
@@ -187,6 +128,34 @@ function emitFunctionSection(node) {
   size.patch(bytes.length - size.offset);
 };
 
+function emitTableSection(node) {
+  bytes.emitU8(WASM_SECTION_TABLE);
+  let size = bytes.createU32vPatch();
+  let count = bytes.createU32vPatch();
+  let amount = 1;
+  // mvp only allows <= 1
+  emitFunctionTable(node);
+  count.patch(amount);
+  size.patch(bytes.length - size.offset);
+};
+
+function emitFunctionTable(node) {
+  // type
+  bytes.emitU8(WASM_TYPE_CTOR_ANYFUNC);
+  // flags
+  bytes.emitU8(1);
+  let count = 0;
+  node.body.map((child) => {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
+      count++;
+    }
+  });
+  // initial
+  bytes.writeVarUnsigned(count);
+  // max
+  bytes.writeVarUnsigned(count);
+};
+
 function emitMemorySection(node) {
   bytes.emitU8(WASM_SECTION_MEMORY);
   // we dont use memory yet, write empty bytes
@@ -194,6 +163,45 @@ function emitMemorySection(node) {
   bytes.emitU32v(1);
   bytes.emitU32v(0);
   bytes.emitU32v(1);
+  size.patch(bytes.length - size.offset);
+};
+
+function emitGlobalSection(node) {
+  bytes.emitU8(WASM_SECTION_GLOBAL);
+  let size = bytes.createU32vPatch();
+  let count = bytes.createU32vPatch();
+  let amount = 0;
+  node.body.map((child) => {
+    // global variable
+    if (child.kind === Nodes.VariableDeclaration && child.isGlobal) {
+      let init = child.init.right;
+      // globals have their own indices, patch it here
+      child.index = amount++;
+      bytes.emitU8(getWasmType(child.type));
+      // mutability, enabled by default
+      bytes.emitU8(1);
+      if ($INCONSTANT_GLOBAL_INITIALIZERS) {
+        bytes.emitU8(WASM_OPCODE_I32_CONST);
+        bytes.emitLEB128(child.resolvedValue);
+      } else {
+        emitNode(init);
+      }
+      bytes.emitU8(WASM_OPCODE_END);
+    }
+    // global enum
+    else if (child.kind === Nodes.EnumDeclaration) {
+      child.index = amount++;
+      // force int32 for now
+      bytes.emitU8(WASM_TYPE_CTOR_I32);
+      // mutability, enabled by default
+      bytes.emitU8(1);
+      // allow resolved values
+      bytes.emitU8(WASM_OPCODE_I32_CONST);
+      bytes.emitLEB128(child.resolvedValue);
+      bytes.emitU8(WASM_OPCODE_END);
+    }
+  });
+  count.patch(amount);
   size.patch(bytes.length - size.offset);
 };
 
@@ -220,6 +228,26 @@ function emitExportSection(node) {
     bytes.emitU8(WASM_EXTERN_MEMORY);
     bytes.emitU8(0);
   })();
+  count.patch(amount);
+  size.patch(bytes.length - size.offset);
+};
+
+function emitElementSection(node) {
+  bytes.emitU8(WASM_SECTION_ELEMENT);
+  let size = bytes.createU32vPatch();
+  let count = bytes.createU32vPatch();
+  let amount = 0;
+  node.body.map((child) => {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
+      // link to anyfunc table
+      bytes.writeVarUnsigned(0);
+      bytes.emitUi32(child.index);
+      bytes.emitU8(WASM_OPCODE_END);
+      bytes.writeVarUnsigned(1);
+      bytes.writeVarUnsigned(child.index);
+      amount++;
+    }
+  });
   count.patch(amount);
   size.patch(bytes.length - size.offset);
 };
@@ -530,6 +558,11 @@ function emitIdentifier(node) {
     // variables are stored in memory too
     bytes.emitUi32(resolve.offset);
     bytes.emitLoad32();
+  }
+  // enum variable
+  else if (resolve.kind === Nodes.Enumerator) {
+    bytes.emitU8(WASM_OPCODE_I32_CONST);
+    bytes.emitLEB128(resolve.resolvedValue);
   }
   else {
     __imports.error("Unknown identifier kind", getLabelName(resolve.kind));

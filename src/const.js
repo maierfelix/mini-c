@@ -31,7 +31,9 @@ let Operators = {};
   Label[Label["FunctionExpression"] = ++ii] = "FunctionExpression";
   Label[Label["FunctionDeclaration"] = ++ii] = "FunctionDeclaration";
   Label[Label["VariableDeclaration"] = ++ii] = "VariableDeclaration";
+  Label[Label["EnumDeclaration"] = ++ii] = "EnumDeclaration";
   Label[Label["Parameter"] = ++ii] = "Parameter";
+  Label[Label["Enumerator"] = ++ii] = "Enumerator";
   Label[Label["Identifier"] = ++ii] = "Identifier";
   Label[Label["Literal"] = ++ii] = "Literal";
   Label[Label["Comment"] = ++ii] = "Comment";
@@ -63,6 +65,7 @@ let Operators = {};
   Label[Label["true"] = ++ii] = "TRUE";
   Label[Label["false"] = ++ii] = "FALSE";
   /** Declaration keywords */
+  Label[Label["enum"] = ++ii] = "ENUM";
   Label[Label["import"] = ++ii] = "IMPORT";
   Label[Label["extern"] = ++ii] = "EXPORT";
   /** Statement keywords */
