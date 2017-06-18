@@ -412,6 +412,12 @@ function emitNode(node) {
       bytes.emitU8(getWasmOperator(operator));
     }
   }
+  // extended functionality in test mode
+  else if ($COMPILER_TEST_MODE) {
+    if (kind === Nodes.RuntimeErrorTrap) {
+      bytes.emitU8(WASM_OPCODE_UNREACHABLE);
+    }
+  }
   else {
     __imports.error("Unknown node kind " + kind);
   }
@@ -751,8 +757,8 @@ function emitFunction(node) {
     emitParameterDeclaration(param);
   });
   emitNode(node.body);
-  // patch function body size
   bytes.emitU8(WASM_OPCODE_END);
+  // patch function body size
   size.patch(bytes.length - size.offset);
 };
 

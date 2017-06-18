@@ -37,6 +37,8 @@ let Operators = {};
   Label[Label["Identifier"] = ++ii] = "Identifier";
   Label[Label["Literal"] = ++ii] = "Literal";
   Label[Label["Comment"] = ++ii] = "Comment";
+  // test mode
+  Label[Label["RuntimeErrorTrap"] = ++ii] = "RuntimeErrorTrap";
 })(Nodes);
 
 /** Data types */

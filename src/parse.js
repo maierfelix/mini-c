@@ -164,7 +164,7 @@ function parseStatement() {
   if (eat(TokenList.EXPORT)) {
     node = parseDeclaration(true);
   } else if (peek(TokenList.ENUM)) {
-    node = parseEnumDeclaration();
+    node = parseEnum();
   } else if (isNativeType(current)) {
     node = parseDeclaration(false);
   } else if (peek(TokenList.RETURN)) {
@@ -183,22 +183,45 @@ function parseStatement() {
   return (node);
 };
 
-function parseEnumDeclaration() {
+function parseEnum() {
   expect(TokenList.ENUM);
-  let node = {
-    kind: Nodes.EnumDeclaration,
-    name: null,
-    items: []
-  };
+  let name = null;
   if (peek(Token.Identifier)) {
-    node.name = current.value;
+    name = current.value;
     next();
   }
-  expect(TokenList.LBRACE);
+  // enum declaration
+  if (eat(TokenList.LBRACE)) {
+    let node = {
+      kind: Nodes.EnumDeclaration,
+      name: name,
+      items: []
+    };
+    parseEnumList(node);
+    expect(TokenList.RBRACE);
+    parseTrailingNames(node);
+    return (node);
+  // enum variable
+  } else {
+    console.log(current);
+  }
+};
+
+function parseTrailingNames(node) {
+  while (true) {
+    if (peek(Token.Identifier)) {
+      console.log(current);
+    }
+    next();
+    if (!eat(TokenList.COMMA)) break;
+  };
+};
+
+function parseEnumList(node) {
   let iter = 0;
   while (true) {
     expectIdentifier();
-    let emura = {
+    let enuma = {
       kind: Nodes.Enumerator,
       name: current.value,
       init: null
@@ -206,21 +229,19 @@ function parseEnumDeclaration() {
     next();
     if (eat(Operators.ASS)) {
       let expr = parseExpression(Operators.LOWEST);
-      emura.init = expr;
-      emura.resolvedValue = evalExpression(expr);
-      iter = emura.resolvedValue;
+      enuma.init = expr;
+      enuma.resolvedValue = evalExpression(expr);
+      iter = enuma.resolvedValue;
     } else {
-      emura.resolvedValue = iter;
+      enuma.resolvedValue = iter;
     }
-    node.items.push(emura);
-    scope.register(emura.name, emura);
+    node.items.push(enuma);
+    scope.register(enuma.name, enuma);
     // allow trailing commas
     eat(TokenList.COMMA);
     if (peek(TokenList.RBRACE)) break;
     iter++;
   };
-  expect(TokenList.RBRACE);
-  return (node);
 };
 
 function parseDeclaration(extern) {
@@ -631,14 +652,15 @@ function parseExpression(level) {
 function parseLiteral() {
   let value = current.value;
   if (current.kind === Token.IDENTIFIER) {
-    /*let ignore = (
-      value === "free" ||
-      value === "malloc"
-    );
-    // manually register native calls
-    if (ignore && !global.symbols[value]) {
-      global.register(value, {});
-    }*/
+    if ($COMPILER_TEST_MODE) {
+      // register $trap as native call
+      if (value === "§TRAP") {
+        next();
+        return ({
+          kind: Nodes.RuntimeErrorTrap
+        });
+      }
+    }
     // make sure the identifier can be resolved
     scope.resolve(value);
   }

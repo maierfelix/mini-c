@@ -18,10 +18,12 @@ function isQuote(cc) {
 };
 
 function isAlpha(cc) {
+  if ($COMPILER_TEST_MODE && cc === 167) return (true);
   return (
     cc >= 65 && cc <= 90 ||
     cc >= 97 && cc <= 122 ||
-    cc === 95
+    cc === 95 ||
+    cc === 36
   );
 };
 

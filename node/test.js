@@ -36,8 +36,14 @@ sources.forEach((name) => {
         passed++;
       }
     } catch (e) {
-      console.log(name + ":" + index + ":", e);
-      errors++;
+      let err = String(e);
+      let expect = expected.slice(2, expected.length);
+      if (expected.slice(0, 2) === "::") {
+        // todo
+      } else {
+        console.log(name + ":" + index + ":", e);
+        errors++;
+      }
     };
   };
 });

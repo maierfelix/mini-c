@@ -1,7 +1,6 @@
 const fs = require("fs");
 
 let bin = "../bin/dist.js";
-let input = fs.readFileSync("../main.momo", "utf-8");
 
 let sources = [];
 (() => {

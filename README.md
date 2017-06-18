@@ -1,5 +1,5 @@
-# <img width="10%" src="http://i.imgur.com/mquA9Ww.png" /> mini-wasm 
-[Just let me play with it](http://maierfelix.github.io/momo/)
+# <img width="42%" src="http://i.imgur.com/lJGRXvt.png" />
+[Just let me play with him](http://maierfelix.github.io/momo/)
 
 ### Description:
 This is an experimental C compiler which compiles into WebAssembly. It's currently written in plain JavaScript but will be rewritten in C (and get self-hosted) as soon as the compiler has enough features to do so.
@@ -36,6 +36,20 @@ compile(`
   };
 `, {}, false);
 ````
- 
+
+### Building
+````
+cd node
+node index
+````
+This generates ``bin/dist.js``
+
+### Testing
+
+````js
+cd node
+node test
+````
+
 ### Contribution:
  - Feel free to send any kind of pull request
