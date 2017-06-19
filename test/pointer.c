@@ -57,11 +57,47 @@ int test4b() {
   return (*ptrA);
 };
 
-int test9() {
+int test5() {
   int a = 10;
   int b = 20;
   int *ptr = &b;
   return (*ptr);
+};
+
+int test6() {
+  int a = 42;
+  int b = 66;
+  int *ptrA = &a;
+  int *ptrB = &b;
+  ptrA = ptrB;
+  return (*ptrA);
+};
+
+int test7() {
+  int a = 42;
+  int b = 66;
+  int *ptrA = &a;
+  int *ptrB = &b;
+  ptrA = ptrB;
+  return (*ptrA);
+};
+
+int test8() {
+  int a = 42;
+  int b = 66;
+  int *ptrA = &a;
+  int *ptrB = &b;
+  ptrA = ptrB;
+  return (ptrA == ptrB);
+};
+
+int test9() {
+  int a = 42;
+  int b = 66;
+  int *ptrA = &a;
+  int *ptrB = &b;
+  ptrA = &b;
+  return (ptrA == ptrB);
 };
 
 int test10() {
@@ -77,48 +113,12 @@ int test11() {
   int a = 42;
   int b = 66;
   int *ptrA = &a;
-  int *ptrB = &b;
-  ptrA = ptrB;
-  return (*ptrA);
-};
-
-int test12() {
-  int a = 42;
-  int b = 66;
-  int *ptrA = &a;
-  int *ptrB = &b;
-  ptrA = ptrB;
-  return (ptrA == ptrB);
-};
-
-int test13() {
-  int a = 42;
-  int b = 66;
-  int *ptrA = &a;
-  int *ptrB = &b;
-  ptrA = &b;
-  return (ptrA == ptrB);
-};
-
-int test14() {
-  int a = 42;
-  int b = 66;
-  int *ptrA = &a;
-  int *ptrB = &b;
-  ptrA = ptrB;
-  return (*ptrA);
-};
-
-int test15() {
-  int a = 42;
-  int b = 66;
-  int *ptrA = &a;
   int *ptrB = &a;
   ptrB = &b;
   return (*ptrB);
 };
 
-int test16() {
+int test12() {
   int a = 42;
   int b = 66;
   int *ptrC = &a;
@@ -128,7 +128,7 @@ int test16() {
   return (*ptrA);
 };
 
-int test17() {
+int test13() {
   int a = 42;
   int b = 66;
   int *ptrA = &a;
@@ -137,27 +137,27 @@ int test17() {
   return (*ptrB + b);
 };
 
-int test18a(int *c, int *d) {
+int test14a(int *c, int *d) {
   int *e = c;
   *(*(&e)) = *d;
   return (0);
 };
-int test18b() {
+int test14b() {
   int a = 42;
   int b = 66;
   int *ptr = &b;
-  int res = test18a(&a, ptr);
+  int res = test14a(&a, ptr);
   return ((*(&a)) + b);
 };
 
-int test19() {
+int test15() {
   int num = 10;
   int *ptr1 = &num;
-  int *ptr2 = ptr1;
-  return (*ptr2 == *ptr1);
+  int *ptr2 = &ptr1;
+  return (**ptr2 == *ptr1);
 };
 
-int test20() {
+int test16() {
   int x = 0;
   int y = 0;
   int *p = &x;
@@ -168,26 +168,26 @@ int test20() {
   return (y == 4 && x == 0);
 };
 
-int test21() {
+int test17() {
   int a = 100;
   int *ptr = &a;
   return ((&ptr != &a) && ptr == &a);
 };
 
-int test22() {
+int test18() {
   int b = 66;
   int *ptr = &b;
   return ((&*ptr) == &b);
 };
 
-int test23() {
+int test19() {
   int a = 66;
   int b = 77;
   int *ptr = &b;
   return (&*ptr == &b);
 };
 
-int test24() {
+int test20() {
   int x = 7;
   int a = 66;
   int *ptr = &a;
@@ -199,20 +199,20 @@ int main() {
   assert(test2b(), 42);
   assert(test3b(), 66);
   assert(test4b(), 66);
-  assert(test9(), 20);
+  assert(test5(), 20);
+  assert(test6(), 66);
+  assert(test7(), 66);
+  assert(test8(), 1);
+  assert(test9(), 1);
   assert(test10(), 66);
   assert(test11(), 66);
-  assert(test12(), 1);
-  assert(test13(), 1);
-  assert(test14(), 66);
-  assert(test15(), 66);
-  assert(test16(), 42);
-  assert(test17(), 154);
-  assert(test18b(), 132);
+  assert(test12(), 42);
+  assert(test13(), 154);
+  assert(test14b(), 132);
+  assert(test15(), 1);
+  assert(test16(), 1);
+  assert(test17(), 1);
+  assert(test18(), 1);
   assert(test19(), 1);
   assert(test20(), 1);
-  assert(test21(), 1);
-  assert(test22(), 1);
-  assert(test23(), 1);
-  assert(test24(), 1);
 };
