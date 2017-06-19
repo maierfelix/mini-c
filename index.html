@@ -38,7 +38,7 @@
     </script>
 
     <script>
-      let url = "main.momo?a=" + Date.now();
+      let url = "main.c?a=" + Date.now();
       fetch(url).then((resp) => resp.text().then((text) => {
         doc.setValue(text);
         cmp.click();

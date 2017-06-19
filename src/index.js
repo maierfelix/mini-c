@@ -30,14 +30,6 @@ function memoryDump(array, limit) {
   return (str);
 };
 
-function loadStdlib() {
-  return new Promise((resolve, reject) => {
-    fetch("../stdlib/memory.momo").then((resp) => resp.text().then((txt) => {
-      resolve(txt);
-    }));
-  });
-};
-
 function compile(str, imports, sync) {
   // reset
   pindex = 0;
@@ -81,9 +73,13 @@ function compile(str, imports, sync) {
   });
 };
 
+let momo = {
+  compile: compile
+};
+
 if (typeof module === "object" && module.exports) {
-  module.exports = compile;
+  module.exports = momo;
 }
 else if (typeof window !== "undefined") {
-  window.compile = compile;
+  window.MOMO = momo;
 }

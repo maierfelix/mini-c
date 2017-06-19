@@ -37,6 +37,11 @@ let Operators = {};
   Label[Label["Identifier"] = ++ii] = "Identifier";
   Label[Label["Literal"] = ++ii] = "Literal";
   Label[Label["Comment"] = ++ii] = "Comment";
+  Label[Label["TypeDefinition"] = ++ii] = "TypeDefinition";
+  Label[Label["LiteralTypeDefinition"] = ++ii] = "LiteralTypeDefinition";
+  Label[Label["FunctionTypeDefinition"] = ++ii] = "FunctionTypeDefinition";
+  Label[Label["PointerLiteralDefinition"] = ++ii] = "PointerLiteralDefinition";
+  Label[Label["ReferenceLiteralDefinition"] = ++ii] = "ReferenceLiteralDefinition";
   // test mode
   Label[Label["RuntimeErrorTrap"] = ++ii] = "RuntimeErrorTrap";
 })(Nodes);

@@ -9,7 +9,7 @@ function getWasmType(type) {
     case TokenList.FLOAT64: return (WASM_TYPE_CTOR_F64);
     case TokenList.BOOL: return (WASM_TYPE_CTOR_I32);
   };
-  return (-1);
+  return (WASM_TYPE_CTOR_VOID);
 };
 
 function getNativeTypeSize(type) {
@@ -235,20 +235,31 @@ function emitExportSection(node) {
 function emitElementSection(node) {
   bytes.emitU8(WASM_SECTION_ELEMENT);
   let size = bytes.createU32vPatch();
-  let count = bytes.createU32vPatch();
+
+  bytes.writeVarUnsigned(1); // element segments
+
+  bytes.emitU8(0); // table index anyfunc
+  bytes.emitU8(WASM_OPCODE_I32_CONST);
+  bytes.emitLEB128(0);
+  bytes.emitU8(WASM_OPCODE_END);
+
+  // sum func indices
   let amount = 0;
   node.body.map((child) => {
     if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
-      // link to anyfunc table
-      bytes.writeVarUnsigned(0);
-      bytes.emitUi32(child.index);
-      bytes.emitU8(WASM_OPCODE_END);
-      bytes.writeVarUnsigned(1);
-      bytes.writeVarUnsigned(child.index);
       amount++;
     }
   });
-  count.patch(amount);
+  // emit function indices count
+  bytes.writeVarUnsigned(amount);
+
+  // emit function indices
+  node.body.map((child) => {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
+      bytes.writeVarUnsigned(child.index);
+    }
+  });
+
   size.patch(bytes.length - size.offset);
 };
 
@@ -326,10 +337,11 @@ function emitNode(node) {
       emitNode(child);
     });
     if (resolve.isPointer) {
+      let signature = getSignatureIndexByFunction(resolve);
       bytes.emitUi32(resolve.offset);
       bytes.emitLoad32();
       bytes.emitU8(WASM_OPCODE_CALL_INDIRECT);
-      bytes.writeVarUnsigned(0); // anyfunc table
+      bytes.writeVarUnsigned(signature);
       bytes.emitU8(0);
     } else {
       bytes.emitU8(WASM_OPCODE_CALL);
@@ -581,7 +593,7 @@ function emitVariableDeclaration(node) {
   node.offset = currentHeapOffset;
   // store pointer
   if (resolve.isPointer) {
-    __imports.log("Store variable", node.id, "in memory at", resolve.offset);
+    __imports.log("Store pointer variable", node.id, "in memory at", resolve.offset);
     // # store the pointed address
     // offset
     bytes.emitUi32(resolve.offset);
@@ -760,6 +772,25 @@ function emitFunction(node) {
   bytes.emitU8(WASM_OPCODE_END);
   // patch function body size
   size.patch(bytes.length - size.offset);
+};
+
+function getSignatureIndexByFunction(node) {
+  let def = node.def;
+  let type = node.type;
+  let params = def.params;
+  let program = global.node.body;
+  let index = -1;
+  program.body.map((child) => {
+    if (child.kind === Nodes.FunctionDeclaration && !child.isPrototype) {
+      if (child.type !== type) return -1;
+      if (child.parameter.length !== params.length) return -1;
+      for (let ii = 0; ii < params.length; ++ii) {
+        if (params[ii] !== child.parameter[ii].type) return -1;
+      };
+      index = child.index;
+    }
+  });
+  return index;
 };
 
 function getLocalSignatureUniforms(locals) {

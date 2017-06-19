@@ -153,7 +153,7 @@ class ByteArray extends Array {
   emitUi32(value) {
     value = value | 0;
     this.emitU8(WASM_OPCODE_I32_CONST);
-    this.writeVarUnsigned(value);
+    this.emitLEB128(value);
   }
   emitLoad32() {
     this.emitU8(WASM_OPCODE_I32_LOAD);

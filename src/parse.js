@@ -244,24 +244,88 @@ function parseEnumList(node) {
   };
 };
 
+function parseDefinition() {
+  // default literal type
+  if (current.kind === Token.Identifier) {
+    let name = current.value;
+    next();
+    return ({
+      kind: Nodes.LiteralTypeDefinition,
+      name: name
+    });
+  }
+  // indirect function type
+  else if (eat(TokenList.LPAREN)) {
+    let name = parseDefinition();
+    expect(TokenList.RPAREN);
+    // parameter
+    let params = [];
+    expect(TokenList.LPAREN);
+    if (!peek(TokenList.RPAREN)) {
+      while (true) {
+        if (!isNativeType(current)) {
+          __imports.error("Expected type declaration but got " + getLabelName(current.kind));
+        }
+        let type = current.kind;
+        params.push(type);
+        next();
+        if (!eat(TokenList.COMMA)) break;
+      };
+    }
+    expect(TokenList.RPAREN);
+    return ({
+      kind: Nodes.FunctionTypeDefinition,
+      name: name,
+      params: params
+    });
+  }
+  else if (current.kind === Operators.MUL) {
+    let count = 0;
+    while (true) {
+      if (!eat(Operators.MUL)) break;
+      count++;
+    };
+    expectIdentifier();
+    let name = parseDefinition();
+    return ({
+      kind: Nodes.PointerLiteralDefinition,
+      name,
+      count
+    });
+  }
+  else if (eat(Operators.BIN_AND)) {
+    return ({
+      kind: Nodes.ReferenceLiteralDefinition,
+      name: parseDefinition()
+    });
+  }
+  else if (isNativeType(current)) {
+    let type = current.kind;
+    next();
+    return ({
+      kind: Nodes.TypeDefinition,
+      type: type
+    });
+  }
+  else {
+    __imports.error("Unsupported type definition " + getLabelName(current.kind));
+  }
+};
+
 function parseDeclaration(extern) {
   let node = null;
-  expectTypeLiteral();
-  const type = current.kind;
-  next();
-  let isPointer = eat(Operators.MUL);
+  let type = parseDefinition();
+  let obj = parseDefinition();
+  //let isPointer = eat(Operators.MUL);
   // if not pointer, check if &-reference
-  let isAlias = false;
-  if (!isPointer) { isAlias = eat(Operators.BIN_AND); }
-  expectIdentifier();
-  const name = current.value;
-  next();
-  const token = current.kind;
-  if (token === Operators.ASS) {
-    node = parseVariableDeclaration(type, name, extern, isPointer, isAlias);
+  //let isAlias = false;
+  //if (!isPointer) { isAlias =  }
+  if (peek(Operators.ASS)) {
+    //node = parseVariableDeclaration(type, name, extern, isPointer, isAlias);
+    return (parseVariableDeclaration(type, obj, extern));
   }
-  else if (TokenList.LPAREN) {
-    node = parseFunctionDeclaration(type, name, extern);
+  else if (peek(TokenList.LPAREN)) {
+    return (parseFunctionDeclaration(type, obj, extern));
   }
   else {
     node = null;
@@ -351,12 +415,13 @@ function parseReturnStatement() {
   return (node);
 };
 
-function parseFunctionDeclaration(type, name, extern) {
+function parseFunctionDeclaration(type, def, extern) {
+  let name = def.name;
   let node = {
     index: 0,
     isExported: !!extern,
     kind: Nodes.FunctionDeclaration,
-    type: type,
+    type: type.type,
     id: name,
     locals: [],
     returns: [],
@@ -444,19 +509,50 @@ function parseFunctionParameter(node) {
   return (param);
 };
 
-function parseVariableDeclaration(type, name, extern, isPointer, isAlias) {
+function getIdByDefinition(def) {
+  let kind = def.kind;
+  switch (kind) {
+    case Nodes.PointerLiteralDefinition:
+    case Nodes.FunctionTypeDefinition:
+      return (getIdByDefinition(def.name));
+    break;
+    case Nodes.LiteralTypeDefinition:
+      return (def.name);
+    break;
+  };
+};
+
+function getPointerCount(def, count) {
+  let kind = def.kind;
+  switch (kind) {
+    case Nodes.FunctionTypeDefinition:
+      return (getPointerCount(def.name, count));
+    break;
+    case Nodes.PointerLiteralDefinition:
+      return (getPointerCount(def.name, count + 1));
+    break;
+    case Nodes.LiteralTypeDefinition:
+      return (count);
+    break;
+  };
+  return (count);
+};
+
+function parseVariableDeclaration(type, def, extern) {
   let node = {
     kind: Nodes.VariableDeclaration,
-    type: type,
-    id: name,
+    type: type.type,
+    def: def,
+    id: null,
     init: null,
     isGlobal: false,
-    isPointer,
-    isAlias
+    isPointer: false,
+    isAlias: def.kind === Nodes.ReferenceLiteralDefinition
   };
+  node.id = getIdByDefinition(def);
+  node.isPointer = getPointerCount(def, 0) > 0;
   // only allow export of global variables
   if (extern) expectScope(node, null);
-  //expectScope(node, Nodes.FunctionDeclaration);
   scope.register(node.id, node);
   if (scope.parent === null) {
     node.isGlobal = true;
@@ -473,7 +569,7 @@ function parseVariableDeclaration(type, name, extern, isPointer, isAlias) {
     right: init,
     operator: "="
   };
-  if (isAlias) {
+  if (node.isAlias) {
     node.aliasValue = init;
     node.aliasReference = {
       kind: Nodes.UnaryPrefixExpression,

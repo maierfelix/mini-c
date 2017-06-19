@@ -45,11 +45,7 @@ node index
 This generates ``bin/dist.js``
 
 ### Testing
-
 ````js
 cd node
 node test
 ````
-
-### Contribution:
- - Feel free to send any kind of pull request
