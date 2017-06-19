@@ -48,4 +48,4 @@ This generates ``bin/dist.js``
 ````js
 cd node
 node test
-````
+
