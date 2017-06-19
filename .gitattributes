@@ -16,4 +16,4 @@
 *.rtf	 diff=astextplain
 *.RTF	 diff=astextplain
 
-/docs/* linguist-vendored=true
+*.html  linguist-vendored=true
