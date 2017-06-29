@@ -26,7 +26,7 @@ node index
 This generates ``bin/dist.js``
 
 ### Testing
+You can either run the tests like below or using the [html version](http://www.felixmaier.info/momo/test/)
 ````js
 cd node
 node test
-
