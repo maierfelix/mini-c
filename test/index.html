@@ -1,0 +1,87 @@
+<html>
+
+<head>
+  <link rel="stylesheet" href="http://esironal.github.io/cmtouch/lib/codemirror.css">
+  <script src="http://esironal.github.io/cmtouch/lib/codemirror.js"></script>
+  <script src="https://codemirror.net/mode/clike/clike.js"></script>
+  <!-- compiler src -->
+  <script type="text/javascript" src="../src/const.js"></script>
+  <script type="text/javascript" src="../src/config.js"></script>
+  <script type="text/javascript" src="../src/bytes.js"></script>
+  <script type="text/javascript" src="../src/scope.js"></script>
+  <script type="text/javascript" src="../src/scan.js"></script>
+  <script type="text/javascript" src="../src/parse.js"></script>
+  <script type="text/javascript" src="../src/eval.js"></script>
+  <script type="text/javascript" src="../src/resolve.js"></script>
+  <script type="text/javascript" src="../src/emit.js"></script>
+  <script type="text/javascript" src="../src/index.js"></script>
+</head>
+
+<body style="list-style-type: none; margin: 0;">
+  <script>
+    document.body.innerHTML = "";
+
+    function GET(url, cb) {
+      let xmlhttp = null;
+      xmlhttp = new XMLHttpRequest();
+      xmlhttp.onreadystatechange = function() {
+        if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+          cb(xmlhttp.responseText);
+        }
+      }
+      xmlhttp.open("GET", url, true);
+      xmlhttp.send();
+    };
+
+    var assert = `
+	  void assert(int a, int b) {
+		if (a != b) { §TRAP; }
+	  }
+	`;
+
+    GET("https://api.github.com/repos/maierfelix/momo/contents/test", (resp) => {
+      let files = JSON.parse(resp);
+      files.forEach((file) => {
+        if (!file.name.match(".c")) return;
+        ((file) => {
+          GET(file.download_url, (src) => {
+
+            src = assert + src;
+
+            let failed = false;
+
+            try {
+
+              var _import = {
+                error: (msg) => {
+                  console.error(file.name, msg);
+                  failed = true;
+                },
+                log: function() {} //console.log.apply(console, arguments); }
+              };
+
+              compile(src, _import).then((result) => {
+                let main = result.exports.main;
+                main();
+              });
+
+            } catch (err) {
+              failed = true;
+              console.error(file.name, err);
+            }
+
+            let el = document.createElement("li");
+            if (failed) {
+              el.innerHTML = "✖️" + file.name;
+            } else {
+              el.innerHTML = "✔️ " + file.name;
+            }
+            document.body.appendChild(el);
+          });
+        })(file);
+      });
+    });
+  </script>
+</body>
+
+</html>
