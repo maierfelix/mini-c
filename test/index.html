@@ -44,7 +44,7 @@
       files.forEach((file) => {
         if (!file.name.match(".c")) return;
         ((file) => {
-          GET(file.download_url, (src) => {
+          GET(file.download_url +"?"+ Date.now(), (src) => {
 
             src = assert + src;
 
