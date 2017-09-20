@@ -30,8 +30,4 @@ fs.writeFileSync(bin, code, "utf-8");
   );
 })();
 
-try {
-  require(bin);
-} catch (e) {
-  throw new Error(e);
-};
+require(bin);
